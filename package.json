@@ -1,0 +1,36 @@
+{
+  "name": "action-seqera-launch",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GitHub Action to launch and monitor Seqera Platform workflows",
+  "type": "module",
+  "scripts": {
+    "build": "rolldown -c rolldown.config.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint",
+    "lint:types": "oxlint --type-aware",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "test": "vitest run",
+    "all": "npm run format:check && npm run lint && npm run lint:types && npm run typecheck && npm run test && npm run build"
+  },
+  "dependencies": {
+    "@actions/core": "3.0.1",
+    "@actions/http-client": "4.0.1",
+    "effect": "4.0.0-rc.110"
+  },
+  "devDependencies": {
+    "@oxlint/plugins": "^1.79.0",
+    "@types/node": "^24",
+    "openapi-typescript": "7.13.0",
+    "oxfmt": "0.64.0",
+    "oxlint": "1.79.0",
+    "oxlint-tsgolint": "7.0.2001",
+    "rolldown": "1.2.4",
+    "typescript": "^5.9.0",
+    "vitest": "^4"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

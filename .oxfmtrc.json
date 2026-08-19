@@ -1,0 +1,11 @@
+{
+  "ignorePatterns": [
+    "dist/**",
+    "node_modules/**",
+    ".agents/**",
+    "openapi/**",
+    "src/api/schema.d.ts",
+    "docs/**",
+    "tools/**"
+  ]
+}

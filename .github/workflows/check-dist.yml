@@ -1,0 +1,45 @@
+name: check-dist
+
+# dist/index.js is committed because the Actions runtime executes it directly.
+# This job fails when it is stale relative to src/.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check-dist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - run: npm ci
+
+      - name: Rebuild the bundle
+        run: npm run build
+
+      - name: Compare against the committed bundle
+        id: diff
+        run: |
+          if [ -n "$(git status --porcelain dist/)" ]; then
+            echo "dist/ is stale. Run 'npm run build' and commit the result."
+            git diff --stat dist/
+            exit 1
+          fi
+          echo "dist/ is up to date."
+
+      - name: Upload the expected bundle
+        if: failure() && steps.diff.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: expected-dist
+          path: dist/

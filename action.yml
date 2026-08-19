@@ -1,0 +1,25 @@
+name: Seqera Platform Launch
+description: Launch and monitor a Nextflow pipeline run on Seqera Platform
+author: Seqera
+
+# The full input/output contract is owned by issue #4 and is deliberately
+# minimal here: only what the scaffold needs to be loadable.
+inputs:
+  access-token:
+    description: Seqera Platform access token
+    required: true
+  api-endpoint:
+    description: Seqera Platform API endpoint
+    required: false
+    default: https://api.cloud.seqera.io
+  workspace-id:
+    description: Seqera Platform workspace ID; defaults to the user workspace
+    required: false
+
+outputs:
+  workflow-id:
+    description: The ID of the launched workflow
+
+runs:
+  using: node24
+  main: dist/index.js
