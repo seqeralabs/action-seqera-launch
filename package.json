@@ -5,6 +5,7 @@
   "description": "GitHub Action to launch and monitor Seqera Platform workflows",
   "type": "module",
   "scripts": {
+    "prepare": "effect-tsgo patch --no-typescript --oxlint",
     "build": "rolldown -c rolldown.config.ts",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint",
@@ -20,11 +21,12 @@
     "effect": "4.0.0-rc.110"
   },
   "devDependencies": {
-    "@oxlint/plugins": "^1.79.0",
+    "@effect/tsgo": "0.36.5",
+    "@oxlint/plugins": "1.78.0",
     "@types/node": "^24",
     "openapi-typescript": "7.13.0",
     "oxfmt": "0.64.0",
-    "oxlint": "1.79.0",
+    "oxlint": "1.78.0",
     "oxlint-tsgolint": "7.0.2001",
     "rolldown": "1.2.4",
     "typescript": "^5.9.0",
