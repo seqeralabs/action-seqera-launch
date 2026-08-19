@@ -35,4 +35,4 @@ All dev commands are the `scripts` in `package.json` (also mirrored by `.github/
 - To exercise the action locally, run `node dist/index.js`. It reads GitHub Actions
   conventions (`INPUT_*` env vars, `GITHUB_OUTPUT`) via `@actions/core`. The current scaffold
   intentionally calls `setFailed` and exits `1` with `::error::action-seqera-launch is not
-  implemented yet` — that is expected until the launch logic (issues #4/#5) lands.
+implemented yet` — that is expected until the launch logic (issues #4/#5) lands.
