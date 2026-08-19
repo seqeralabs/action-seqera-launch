@@ -77,14 +77,20 @@ inputs:
     description: Memory in MB for the Nextflow head job
     required: false
 
+  # ADR 0006: enum, not v2's boolean. `running` catches submit-time and
+  # validation failures without holding a runner open for a whole pipeline.
   wait:
-    description: Wait for the run to reach a terminal state
+    description: How long to wait; one of running, completion, or none
     required: false
-    default: "false"
+    default: running
+  timeout:
+    description: >-
+      Max time to wait, e.g. 90m. Unset polls until the job's own time limit.
+    required: false
 
 # ADR 0005 drops action-tower-launch's `json` output so the response shape does
-# not become a public contract. Whether status and error-message join this set
-# is issue #5's call.
+# not become a public contract. ADR 0006 adds status and error-message so
+# callers can branch or build a PR comment without re-querying the API.
 outputs:
   workflow-id:
     description: The ID of the launched workflow
@@ -94,6 +100,10 @@ outputs:
     description: The workspace the run was launched into
   workspace-ref:
     description: The workspace reference, as org/workspace
+  status:
+    description: Terminal workflow status, when waited for
+  error-message:
+    description: Failure message from the run, when it failed
 
 runs:
   using: node24
