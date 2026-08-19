@@ -2,34 +2,25 @@ import * as core from "@actions/core";
 import type { DescribeWorkflowResponse } from "../api/schemas/workflow.js";
 import { workspaceRef, workflowWatchUrl } from "../monitoring/workflow-url.js";
 
-export interface ActionOutputs {
-  readonly workflowId: string;
-  readonly workflowUrl: string;
-  readonly workspaceId: string;
-  readonly workspaceRef: string;
-  readonly status?: string;
-  readonly errorMessage?: string;
-}
-
 export interface ActionOutputOptions {
   readonly status?: string;
   readonly errorMessage?: string;
 }
 
-export function buildActionOutputOptions(
-  status: string | undefined,
-  errorMessage: string | undefined,
-): ActionOutputOptions {
-  if (status !== undefined && errorMessage !== undefined) {
-    return { status, errorMessage };
+export function buildActionOutputOptions(input: {
+  status?: string | undefined;
+  errorMessage?: string | undefined;
+}): ActionOutputOptions | undefined {
+  if (input.status !== undefined && input.errorMessage !== undefined) {
+    return { status: input.status, errorMessage: input.errorMessage };
   }
-  if (status !== undefined) {
-    return { status };
+  if (input.status !== undefined) {
+    return { status: input.status };
   }
-  if (errorMessage !== undefined) {
-    return { errorMessage };
+  if (input.errorMessage !== undefined) {
+    return { errorMessage: input.errorMessage };
   }
-  return {};
+  return undefined;
 }
 
 export function setActionOutputs(
@@ -37,7 +28,7 @@ export function setActionOutputs(
   describe: DescribeWorkflowResponse,
   workflowId: string,
   options?: ActionOutputOptions,
-): ActionOutputs {
+): void {
   const orgName = describe.orgName ?? "unknown-org";
   const workspaceName = describe.workspaceName ?? "unknown-workspace";
   const wsId = describe.workspaceId === undefined ? "" : String(describe.workspaceId);
@@ -54,22 +45,4 @@ export function setActionOutputs(
   if (options?.errorMessage !== undefined) {
     core.setOutput("error-message", options.errorMessage);
   }
-
-  const base = {
-    workflowId,
-    workflowUrl: url,
-    workspaceId: wsId,
-    workspaceRef: ref,
-  };
-  const extra = buildActionOutputOptions(options?.status, options?.errorMessage);
-  if (extra.status !== undefined && extra.errorMessage !== undefined) {
-    return { ...base, status: extra.status, errorMessage: extra.errorMessage };
-  }
-  if (extra.status !== undefined) {
-    return { ...base, status: extra.status };
-  }
-  if (extra.errorMessage !== undefined) {
-    return { ...base, errorMessage: extra.errorMessage };
-  }
-  return base;
 }

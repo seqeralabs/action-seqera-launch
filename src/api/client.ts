@@ -1,4 +1,4 @@
-import { HttpClient, HttpClientError } from "@actions/http-client";
+import { HttpClient } from "@actions/http-client";
 import { Duration, Effect, Schedule, Schema } from "effect";
 import { ApiDecodeError, HttpResponseError, HttpTransientError } from "../errors.js";
 import { parseJson, type JsonValue } from "../json.js";
@@ -11,7 +11,7 @@ export interface SeqeraClientConfig {
 }
 
 export interface RequestOptions {
-  readonly method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
+  readonly method: "GET" | "POST";
   readonly path: string;
   readonly query?: Record<string, string | number | undefined> | undefined;
   readonly body?: unknown;
@@ -76,9 +76,6 @@ export interface SeqeraHttpResponse {
 export interface SeqeraHttpTransport {
   get(url: string, headers: Record<string, string>): Promise<SeqeraHttpResponse>;
   post(url: string, data: string, headers: Record<string, string>): Promise<SeqeraHttpResponse>;
-  patch(url: string, data: string, headers: Record<string, string>): Promise<SeqeraHttpResponse>;
-  put(url: string, data: string, headers: Record<string, string>): Promise<SeqeraHttpResponse>;
-  del(url: string, headers: Record<string, string>): Promise<SeqeraHttpResponse>;
 }
 
 function isTransientStatus(statusCode: number): boolean {
@@ -90,9 +87,6 @@ function defaultHttpTransport(): SeqeraHttpTransport {
   return {
     get: (url, headers) => client.get(url, headers),
     post: (url, data, headers) => client.post(url, data, headers),
-    patch: (url, data, headers) => client.patch(url, data, headers),
-    put: (url, data, headers) => client.put(url, data, headers),
-    del: (url, headers) => client.del(url, headers),
   };
 }
 
@@ -121,12 +115,6 @@ export function createSeqeraClient(
               return http.get(url, headers);
             case "POST":
               return http.post(url, requestBody ?? "", headers);
-            case "PATCH":
-              return http.patch(url, requestBody ?? "", headers);
-            case "PUT":
-              return http.put(url, requestBody ?? "", headers);
-            case "DELETE":
-              return http.del(url, headers);
             default: {
               const _exhaustive: never = options.method;
               throw new Error(`Unsupported HTTP method: ${String(_exhaustive)}`);
@@ -246,11 +234,7 @@ export function createSeqeraClient(
       });
     });
 
-  return { requestJson, requestOnce, config };
+  return { requestJson, config };
 }
 
 export type SeqeraClient = ReturnType<typeof createSeqeraClient>;
-
-export function isHttpClientError(error: Error): error is HttpClientError {
-  return error instanceof HttpClientError;
-}

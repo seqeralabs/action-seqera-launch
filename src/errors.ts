@@ -1,6 +1,6 @@
 import { Data } from "effect";
+import type { DescribeWorkflowResponse } from "./api/schemas/workflow.js";
 import type { JsonValue } from "./json.js";
-import type { WorkflowDbDto } from "./api/schemas/workflow.js";
 
 export class InputValidationError extends Data.TaggedError("InputValidationError")<{
   readonly input: string;
@@ -42,6 +42,7 @@ export class HttpResponseError extends Data.TaggedError("HttpResponseError")<{
 export class WorkflowTerminalFailureError extends Data.TaggedError("WorkflowTerminalFailureError")<{
   readonly status: string;
   readonly workflowUrl: string;
+  readonly describe: DescribeWorkflowResponse;
   readonly errorMessage?: string;
   readonly errorReport?: string;
   readonly exitStatus?: number;
@@ -73,6 +74,7 @@ export type ActionError =
 type WorkflowTerminalFailurePayload = {
   status: string;
   workflowUrl: string;
+  describe: DescribeWorkflowResponse;
   errorMessage?: string;
   errorReport?: string;
   exitStatus?: number;
@@ -81,13 +83,15 @@ type WorkflowTerminalFailurePayload = {
 export function workflowTerminalFailure(
   status: string,
   workflowUrl: string,
-  workflow: WorkflowDbDto | undefined,
+  describe: DescribeWorkflowResponse,
   errorMessageOverride?: string,
 ): WorkflowTerminalFailureError {
+  const workflow = describe.workflow;
   const errorMessage = errorMessageOverride ?? workflow?.errorMessage;
   const fields: WorkflowTerminalFailurePayload = {
     status,
     workflowUrl,
+    describe,
   };
   if (errorMessage !== undefined) {
     fields.errorMessage = errorMessage;

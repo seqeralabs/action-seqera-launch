@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Effect } from "effect";
 import { createSeqeraClient } from "../src/api/client.js";
-import { describeWorkflow } from "../src/api/endpoints.js";
 import { monitorWorkflow } from "../src/monitoring/poll.js";
 import { MockHttpClient, MockHttpResponse } from "./helpers/mock-http.js";
 
@@ -94,18 +93,5 @@ describe("monitorWorkflow", () => {
         ),
       ),
     ).rejects.toMatchObject({ _tag: "WorkflowTerminalFailureError" });
-  });
-});
-
-describe("describeWorkflow", () => {
-  it("decodes workflow status from the API", async () => {
-    const http = new MockHttpClient().when(
-      "/workflow/wf-1",
-      () => new MockHttpResponse({ statusCode: 200, headers: {} }, describeRunning),
-    );
-    const client = testClient(http);
-
-    const response = await Effect.runPromise(describeWorkflow(client, "wf-1", 1));
-    expect(response.workflow?.status).toBe("RUNNING");
   });
 });

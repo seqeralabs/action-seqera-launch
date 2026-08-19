@@ -1,8 +1,8 @@
 import * as core from "@actions/core";
 import { Effect } from "effect";
-import { createWorkflowLaunch, describeWorkflow, listComputeEnvs } from "../api/endpoints.js";
+import { createSeqeraClient } from "../api/client.js";
+import { createWorkflowLaunch, listComputeEnvs } from "../api/endpoints.js";
 import type { ListComputeEnvsResponseEntry } from "../api/schemas/compute-env.js";
-import type { SeqeraClient } from "../api/client.js";
 import {
   ComputeEnvAmbiguousError,
   ComputeEnvNotFoundError,
@@ -16,10 +16,12 @@ import {
 } from "../monitoring/report.js";
 import { workspaceRef, workflowWatchUrl } from "../monitoring/workflow-url.js";
 import { readActionInputs } from "./inputs.js";
-import { setActionOutputs, buildActionOutputOptions } from "./outputs.js";
+import { buildActionOutputOptions, setActionOutputs } from "./outputs.js";
+
+const USER_AGENT = "seqeralabs/action-seqera-launch";
 
 function resolveComputeEnvId(
-  client: SeqeraClient,
+  client: ReturnType<typeof createSeqeraClient>,
   workspaceId: number | undefined,
   computeEnvId: string | undefined,
   computeEnvName: string | undefined,
@@ -65,41 +67,32 @@ function resolveComputeEnvId(
 }
 
 function handleWorkflowTerminalFailure(
-  client: SeqeraClient,
+  client: ReturnType<typeof createSeqeraClient>,
   apiEndpoint: string,
   workflowId: string,
   workspaceId: number | undefined,
   error: WorkflowTerminalFailureError,
 ) {
   return Effect.gen(function* () {
-    const describe = yield* describeWorkflow(client, workflowId, workspaceId).pipe(
-      Effect.catchIf(
-        () => true,
-        () => Effect.succeed(undefined),
-      ),
-    );
-
-    if (describe === undefined) {
-      return;
-    }
-
-    yield* reportWorkflowFailure(client, apiEndpoint, describe, workflowId, workspaceId);
+    yield* reportWorkflowFailure(client, apiEndpoint, error.describe, workflowId, workspaceId);
 
     setActionOutputs(
       apiEndpoint,
-      describe,
+      error.describe,
       workflowId,
-      buildActionOutputOptions(error.status, error.errorMessage),
+      buildActionOutputOptions({
+        status: error.status,
+        errorMessage: error.errorMessage,
+      }),
     );
 
+    const orgName = error.describe.orgName ?? "unknown-org";
+    const workspaceName = error.describe.workspaceName ?? "unknown-workspace";
     writeJobSummary(
       buildJobSummaryOptions({
         workflowId,
         workflowUrl: error.workflowUrl,
-        workspaceRef:
-          describe.orgName !== undefined && describe.workspaceName !== undefined
-            ? workspaceRef(describe.orgName, describe.workspaceName)
-            : "unknown",
+        workspaceRef: workspaceRef(orgName, workspaceName),
         status: error.status,
         errorMessage: error.errorMessage,
         succeeded: false,
@@ -108,14 +101,13 @@ function handleWorkflowTerminalFailure(
   });
 }
 
-export function runAction(
-  clientFactory: (config: { baseUrl: string; accessToken: string }) => SeqeraClient,
-) {
+export function runAction() {
   return Effect.gen(function* () {
     const inputs = yield* readActionInputs();
-    const client = clientFactory({
+    const client = createSeqeraClient({
       baseUrl: inputs.apiEndpoint,
       accessToken: inputs.accessToken,
+      userAgent: USER_AGENT,
     });
 
     const resolved = yield* resolveComputeEnvId(
@@ -165,7 +157,10 @@ export function runAction(
       inputs.apiEndpoint,
       describe,
       workflowId,
-      buildActionOutputOptions(status, describe.workflow?.errorMessage),
+      buildActionOutputOptions({
+        status,
+        errorMessage: describe.workflow?.errorMessage,
+      }),
     );
 
     writeJobSummary(

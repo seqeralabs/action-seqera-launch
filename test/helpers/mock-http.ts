@@ -47,16 +47,4 @@ export class MockHttpClient implements SeqeraHttpTransport {
   post(url: string, data: string, _headers: Record<string, string>): Promise<SeqeraHttpResponse> {
     return this.dispatch(url, "POST", data);
   }
-
-  patch(url: string, data: string, _headers: Record<string, string>): Promise<SeqeraHttpResponse> {
-    return this.dispatch(url, "PATCH", data);
-  }
-
-  put(url: string, data: string, _headers: Record<string, string>): Promise<SeqeraHttpResponse> {
-    return this.dispatch(url, "PUT", data);
-  }
-
-  del(url: string, _headers: Record<string, string>): Promise<SeqeraHttpResponse> {
-    return this.dispatch(url, "DELETE");
-  }
 }

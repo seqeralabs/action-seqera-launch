@@ -92,9 +92,9 @@ export function buildJobSummaryOptions(input: {
   workflowId: string;
   workflowUrl: string;
   workspaceRef: string;
-  status: string | undefined;
-  errorMessage: string | undefined;
   succeeded: boolean;
+  status?: string | undefined;
+  errorMessage?: string | undefined;
 }): JobSummaryOptions {
   if (input.status !== undefined && input.errorMessage !== undefined) {
     return {

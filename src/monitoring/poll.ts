@@ -126,7 +126,7 @@ export function monitorWorkflow(
 
       if (wait === "running" && knownStatus !== "SUBMITTED") {
         if (isTerminalStatus(knownStatus)) {
-          return yield* Effect.fail(workflowTerminalFailure(knownStatus, url, describe.workflow));
+          return yield* Effect.fail(workflowTerminalFailure(knownStatus, url, describe));
         }
         core.info(`Workflow launched and is ${knownStatus}. The run is still executing: ${url}`);
         return { describe, waitOutcome: "running" as const } satisfies PollSuccess;
@@ -137,7 +137,7 @@ export function monitorWorkflow(
           return { describe, waitOutcome: "completion" as const } satisfies PollSuccess;
         }
         if (isTerminalStatus(knownStatus)) {
-          return yield* Effect.fail(workflowTerminalFailure(knownStatus, url, describe.workflow));
+          return yield* Effect.fail(workflowTerminalFailure(knownStatus, url, describe));
         }
       }
 
@@ -146,7 +146,7 @@ export function monitorWorkflow(
           workflowTerminalFailure(
             knownStatus,
             url,
-            describe.workflow,
+            describe,
             `Timed out after ${String(timeoutMs)} ms while waiting for ${wait}`,
           ),
         );

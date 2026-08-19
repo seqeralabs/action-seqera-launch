@@ -44,9 +44,4 @@ type _AssertWorkflowLaunchValidationErrorResponse =
       : never
     : never;
 
-export const LaunchErrorResponseSchema = Schema.Union([
-  ErrorResponseSchema,
-  WorkflowLaunchValidationErrorResponseSchema,
-]);
-
-export type LaunchErrorResponse = Schema.Schema.Type<typeof LaunchErrorResponseSchema>;
+export type LaunchErrorResponse = ErrorResponse | WorkflowLaunchValidationErrorResponse;
