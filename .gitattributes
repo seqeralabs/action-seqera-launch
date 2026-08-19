@@ -1,5 +1,8 @@
 # OpenAPI codegen output (npm run codegen)
 src/api/schema.d.ts linguist-generated
 
+# Pinned upstream OpenAPI spec (refreshed from Seqera, not hand-edited)
+openapi/** linguist-generated
+
 # Bundled action entrypoint (npm run build)
 dist/** linguist-generated
