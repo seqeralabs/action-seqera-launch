@@ -12,13 +12,15 @@
     "lint:types": "oxlint --type-aware",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
+    "codegen": "openapi-typescript openapi/seqera-api-1.198.0.yml -o src/api/schema.d.ts",
     "test": "vitest run",
     "all": "npm run format:check && npm run lint && npm run lint:types && npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {
     "@actions/core": "3.0.1",
     "@actions/http-client": "4.0.1",
-    "effect": "4.0.0-rc.110"
+    "effect": "4.0.0-rc.110",
+    "yaml": "^2.8.1"
   },
   "devDependencies": {
     "@effect/tsgo": "0.36.5",
