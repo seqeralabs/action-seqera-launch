@@ -15,15 +15,26 @@ const INPUT_ENV = {
 
 describe("readActionInputs", () => {
   const previous = new Map<string, string | undefined>();
+  const inputPrefix = "INPUT_";
 
   beforeEach(() => {
+    for (const key of Object.keys(process.env)) {
+      if (key.startsWith(inputPrefix)) {
+        previous.set(key, process.env[key]);
+        delete process.env[key];
+      }
+    }
     for (const [key, value] of Object.entries(INPUT_ENV)) {
-      previous.set(key, process.env[key]);
       process.env[key] = value;
     }
   });
 
   afterEach(() => {
+    for (const key of Object.keys(process.env)) {
+      if (key.startsWith(inputPrefix)) {
+        delete process.env[key];
+      }
+    }
     for (const [key, value] of previous.entries()) {
       if (value === undefined) {
         delete process.env[key];
@@ -31,6 +42,7 @@ describe("readActionInputs", () => {
         process.env[key] = value;
       }
     }
+    previous.clear();
   });
 
   it("maps kebab-case inputs to launch request fields", async () => {
@@ -51,5 +63,28 @@ describe("readActionInputs", () => {
       _tag: "InputValidationError",
       input: "api-endpoint",
     });
+  });
+
+  it("parses timeout durations", async () => {
+    process.env.INPUT_TIMEOUT = "90m";
+
+    const inputs = await Effect.runPromise(readActionInputs());
+    expect(inputs.timeoutMs).toBe(90 * 60_000);
+  });
+
+  it("rejects invalid timeout values", async () => {
+    process.env.INPUT_TIMEOUT = "not-a-duration";
+
+    await expect(Effect.runPromise(readActionInputs())).rejects.toMatchObject({
+      _tag: "InputValidationError",
+      input: "timeout",
+    });
+  });
+
+  it("accepts YAML parameters and normalizes them to JSON", async () => {
+    process.env.INPUT_PARAMETERS = "foo: bar\n";
+
+    const inputs = await Effect.runPromise(readActionInputs());
+    expect(inputs.launch.paramsText).toBe('{"foo":"bar"}');
   });
 });

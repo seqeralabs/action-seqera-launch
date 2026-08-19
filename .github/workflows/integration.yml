@@ -1,0 +1,64 @@
+# Integration smoke — manual end-to-end check against live Seqera Platform.
+#
+# Operator setup:
+# 1. Create repo secret SEQERA_ACCESS_TOKEN (staging token with launch permission)
+# 2. Actions → Integration smoke → Run workflow
+# 3. Adjust pipeline / compute-env inputs if the default workspace primary env cannot start stub runs
+
+name: Integration smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      pipeline:
+        description: Nextflow pipeline repository URL
+        required: false
+        default: https://github.com/nextflow-io/hello
+        type: string
+      compute-env:
+        description: Compute environment name (optional)
+        required: false
+        type: string
+      compute-env-id:
+        description: Compute environment ID (optional; wins over name)
+        required: false
+        type: string
+      workspace-id:
+        description: Workspace ID (optional)
+        required: false
+        type: string
+      api-endpoint:
+        description: Seqera Platform API endpoint
+        required: false
+        default: https://api.cloud.seqera.io
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Launch stub workflow
+        id: launch
+        uses: ./
+        with:
+          access-token: ${{ secrets.SEQERA_ACCESS_TOKEN }}
+          api-endpoint: ${{ inputs.api-endpoint }}
+          pipeline: ${{ inputs.pipeline }}
+          stub-run: true
+          wait: running
+          compute-env: ${{ inputs.compute-env }}
+          compute-env-id: ${{ inputs.compute-env-id }}
+          workspace-id: ${{ inputs.workspace-id }}
+
+      - name: Assert outputs
+        run: |
+          test -n "${{ steps.launch.outputs.workflow-id }}"
+          test -n "${{ steps.launch.outputs.workflow-url }}"
+          test -n "${{ steps.launch.outputs.workspace-id }}"
+          test -n "${{ steps.launch.outputs.workspace-ref }}"
+          test -n "${{ steps.launch.outputs.status }}"
