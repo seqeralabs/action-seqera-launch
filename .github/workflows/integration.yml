@@ -1,13 +1,16 @@
-# Integration smoke — manual end-to-end check against live Seqera Platform.
+# Dogfood the action against live Seqera Platform.
 #
-# Operator setup:
-# 1. Create repo secret SEQERA_ACCESS_TOKEN (staging token with launch permission)
-# 2. Actions → Integration smoke → Run workflow
-# 3. Adjust pipeline / compute-env inputs if the default workspace primary env cannot start stub runs
+# Required repo secret: SEQERA_ACCESS_TOKEN
+# Optional secrets: SEQERA_WORKSPACE_ID, SEQERA_COMPUTE_ENV, SEQERA_API_ENDPOINT
+#
+# Skips fork PRs (no secrets) and forks of this repository.
 
-name: Integration smoke
+name: Integration
 
 on:
+  push:
+    branches: [main]
+  pull_request:
   workflow_dispatch:
     inputs:
       pipeline:
@@ -33,32 +36,84 @@ on:
         default: https://api.cloud.seqera.io
         type: string
 
+concurrency:
+  group: integration-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
-  smoke:
+  launch:
+    name: Launch on Seqera Platform
+    if: >-
+      github.repository == 'seqeralabs/action-seqera-launch' &&
+      (github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - name: Launch stub workflow
+      - name: Launch stub pipeline
         id: launch
         uses: ./
         with:
           access-token: ${{ secrets.SEQERA_ACCESS_TOKEN }}
-          api-endpoint: ${{ inputs.api-endpoint }}
-          pipeline: ${{ inputs.pipeline }}
+          api-endpoint: >-
+            ${{ github.event_name == 'workflow_dispatch'
+            && inputs.api-endpoint
+            || secrets.SEQERA_API_ENDPOINT
+            || 'https://api.cloud.seqera.io' }}
+          pipeline: >-
+            ${{ github.event_name == 'workflow_dispatch'
+            && inputs.pipeline
+            || 'https://github.com/nextflow-io/hello' }}
           stub-run: true
           wait: running
-          compute-env: ${{ inputs.compute-env }}
-          compute-env-id: ${{ inputs.compute-env-id }}
-          workspace-id: ${{ inputs.workspace-id }}
+          compute-env: >-
+            ${{ github.event_name == 'workflow_dispatch'
+            && inputs.compute-env
+            || secrets.SEQERA_COMPUTE_ENV }}
+          compute-env-id: >-
+            ${{ github.event_name == 'workflow_dispatch' && inputs.compute-env-id || '' }}
+          workspace-id: >-
+            ${{ github.event_name == 'workflow_dispatch'
+            && inputs.workspace-id
+            || secrets.SEQERA_WORKSPACE_ID }}
 
-      - name: Assert outputs
+      - name: Assert launch outputs
         run: |
           test -n "${{ steps.launch.outputs.workflow-id }}"
           test -n "${{ steps.launch.outputs.workflow-url }}"
           test -n "${{ steps.launch.outputs.workspace-id }}"
           test -n "${{ steps.launch.outputs.workspace-ref }}"
           test -n "${{ steps.launch.outputs.status }}"
+
+      - name: Reject invalid pipeline
+        id: invalid_launch
+        continue-on-error: true
+        uses: ./
+        with:
+          access-token: ${{ secrets.SEQERA_ACCESS_TOKEN }}
+          api-endpoint: >-
+            ${{ github.event_name == 'workflow_dispatch'
+            && inputs.api-endpoint
+            || secrets.SEQERA_API_ENDPOINT
+            || 'https://api.cloud.seqera.io' }}
+          pipeline: no_pipeline_exists
+          stub-run: true
+          wait: none
+          workspace-id: >-
+            ${{ github.event_name == 'workflow_dispatch'
+            && inputs.workspace-id
+            || secrets.SEQERA_WORKSPACE_ID }}
+
+      - name: Check invalid pipeline failed
+        if: steps.invalid_launch.outcome == 'success'
+        env:
+          OUTCOME: ${{ steps.invalid_launch.outcome }}
+        run: |
+          echo "Expected invalid pipeline launch to fail, got: $OUTCOME"
+          exit 1
