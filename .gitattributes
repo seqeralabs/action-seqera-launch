@@ -1,0 +1,5 @@
+# OpenAPI codegen output (npm run codegen)
+src/api/schema.d.ts linguist-generated
+
+# Bundled action entrypoint (npm run build)
+dist/** linguist-generated
