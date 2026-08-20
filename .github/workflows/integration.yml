@@ -3,6 +3,10 @@
 # Required repo secrets: SEQERA_ACCESS_TOKEN, SEQERA_WORKSPACE_ID, SEQERA_COMPUTE_ENV
 # Optional secret: SEQERA_API_ENDPOINT
 #
+# Rotation: 1Password Scientific Development /
+# "action-seqera-launch CI (cloud.seqera.io)".
+# Workspace role: maintain on seqeralabs/automated-testing.
+#
 # No work-dir is passed on purpose: the action falls back to the compute
 # environment's own work directory, which is the path most users hit.
 #
