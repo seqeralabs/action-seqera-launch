@@ -159,7 +159,7 @@ export function runAction() {
       workflowId,
       buildActionOutputOptions({
         status,
-        errorMessage: describe.workflow?.errorMessage,
+        errorMessage: describe.workflow?.errorMessage ?? undefined,
       }),
     );
 
@@ -169,7 +169,7 @@ export function runAction() {
         workflowUrl: url,
         workspaceRef: ref,
         status,
-        errorMessage: describe.workflow?.errorMessage,
+        errorMessage: describe.workflow?.errorMessage ?? undefined,
         succeeded: true,
       }),
     );

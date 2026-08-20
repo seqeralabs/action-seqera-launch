@@ -21,10 +21,13 @@ type _AssertWorkflowStatus = WorkflowStatus extends ApiWorkflowStatus ? true : n
 export const WorkflowDbDtoSchema = Schema.Struct({
   id: Schema.optionalKey(Schema.String),
   status: Schema.optionalKey(WorkflowStatusSchema),
-  errorMessage: Schema.optionalKey(Schema.String),
-  errorReport: Schema.optionalKey(Schema.String),
-  exitStatus: Schema.optionalKey(Schema.Number),
-  runName: Schema.optionalKey(Schema.String),
+  // The API returns null for these while a run is still in flight. The
+  // committed OpenAPI spec types them as plain strings, so decoding would
+  // otherwise fail on the very first poll of every launch.
+  errorMessage: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  errorReport: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  exitStatus: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+  runName: Schema.optionalKey(Schema.NullOr(Schema.String)),
 });
 
 export type WorkflowDbDto = Schema.Schema.Type<typeof WorkflowDbDtoSchema>;
