@@ -6,7 +6,7 @@ export const TaskSchema = Schema.Struct({
   name: Schema.optionalKey(Schema.String),
   process: Schema.optionalKey(Schema.String),
   status: Schema.optionalKey(Schema.String),
-  errorMessage: Schema.optionalKey(Schema.String),
+  errorMessage: Schema.optionalKey(Schema.NullOr(Schema.String)),
 });
 
 export type Task = Schema.Schema.Type<typeof TaskSchema>;
