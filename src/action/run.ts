@@ -161,7 +161,7 @@ export function runAction() {
         launchRequest.workDir = resolved.workDir;
         core.info(`Using compute environment work directory ${resolved.workDir}`);
       } else if (inputs.computeEnvId === undefined) {
-        return yield* Effect.fail(new WorkDirMissingError({ computeEnv: resolved.label }));
+        return yield* new WorkDirMissingError({ computeEnv: resolved.label });
       }
     }
 
@@ -216,5 +216,6 @@ export function runAction() {
         succeeded: true,
       }),
     );
+    return undefined;
   });
 }

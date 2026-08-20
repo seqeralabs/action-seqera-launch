@@ -87,28 +87,6 @@ export type ActionError =
   | WorkflowStuckSubmittedError
   | UnknownWorkflowStatusError;
 
-// Keyed by tag so the compiler rejects both missing and unknown entries when
-// an ActionError member is added or removed.
-const ACTION_ERROR_TAG_SET: Record<ActionError["_tag"], true> = {
-  InputValidationError: true,
-  ApiDecodeError: true,
-  LaunchValidationError: true,
-  ComputeEnvNotFoundError: true,
-  ComputeEnvAmbiguousError: true,
-  ComputeEnvNoPrimaryError: true,
-  ComputeEnvUnavailableError: true,
-  WorkDirMissingError: true,
-  HttpTransientError: true,
-  HttpResponseError: true,
-  WorkflowTerminalFailureError: true,
-  WorkflowStuckSubmittedError: true,
-  UnknownWorkflowStatusError: true,
-};
-
-export function isActionErrorTag(tag: string): tag is ActionError["_tag"] {
-  return Object.hasOwn(ACTION_ERROR_TAG_SET, tag);
-}
-
 type WorkflowTerminalFailurePayload = {
   status: string;
   workflowUrl: string;
@@ -134,11 +112,13 @@ export function workflowTerminalFailure(
   if (errorMessage !== undefined) {
     fields.errorMessage = errorMessage;
   }
-  if (workflow?.errorReport != null) {
-    fields.errorReport = workflow.errorReport;
+  const errorReport = workflow?.errorReport ?? undefined;
+  if (errorReport !== undefined) {
+    fields.errorReport = errorReport;
   }
-  if (workflow?.exitStatus != null) {
-    fields.exitStatus = workflow.exitStatus;
+  const exitStatus = workflow?.exitStatus ?? undefined;
+  if (exitStatus !== undefined) {
+    fields.exitStatus = exitStatus;
   }
   return new WorkflowTerminalFailureError(fields);
 }
