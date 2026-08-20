@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { Effect } from "effect";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createSeqeraClient } from "../src/api/client.js";
-import { buildJobSummaryOptions, reportWorkflowFailure } from "../src/monitoring/report.js";
+import {
+  buildJobSummaryOptions,
+  reportWorkflowFailure,
+  writeJobSummary,
+} from "../src/monitoring/report.js";
 import { MockHttpClient, MockHttpResponse } from "./helpers/mock-http.js";
 
 describe("buildJobSummaryOptions", () => {
@@ -91,5 +98,30 @@ describe("reportWorkflowFailure", () => {
     );
 
     expect(url).toBe("https://example.com/orgs/org/workspaces/ws/watch/42");
+  });
+});
+
+describe("writeJobSummary", () => {
+  it("writes the summary to GITHUB_STEP_SUMMARY", async () => {
+    const path = `${mkdtempSync(join(tmpdir(), "seqera-summary-"))}/summary.md`;
+    writeFileSync(path, "");
+    process.env["GITHUB_STEP_SUMMARY"] = path;
+
+    await Effect.runPromise(
+      writeJobSummary(
+        buildJobSummaryOptions({
+          workflowId: "wf-1",
+          workflowUrl: "https://example.com/watch/1",
+          workspaceRef: "org/ws",
+          succeeded: true,
+          status: "SUCCEEDED",
+        }),
+      ),
+    );
+
+    const written = readFileSync(path, "utf8");
+    expect(written).toContain("Seqera Platform Launch");
+    expect(written).toContain("wf-1");
+    expect(written).toContain("Launch step completed successfully.");
   });
 });

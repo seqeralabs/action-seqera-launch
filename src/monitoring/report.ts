@@ -151,4 +151,5 @@ export function writeJobSummary(options: JobSummaryOptions) {
   } else {
     summary.addRaw("\nLaunch step failed.\n");
   }
+  return Effect.promise(() => summary.write());
 }
