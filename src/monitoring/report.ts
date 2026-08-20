@@ -32,13 +32,13 @@ export function reportWorkflowFailure(
     const workspaceName = describe.workspaceName ?? "unknown-workspace";
     const url = workflowWatchUrl(apiEndpoint, orgName, workspaceName, workflowId);
 
-    if (workflow?.errorMessage !== undefined) {
+    if (workflow?.errorMessage != null) {
       core.error(`errorMessage: ${workflow.errorMessage}`);
     }
-    if (workflow?.errorReport !== undefined) {
+    if (workflow?.errorReport != null) {
       core.error(`errorReport: ${workflow.errorReport}`);
     }
-    if (workflow?.exitStatus !== undefined) {
+    if (workflow?.exitStatus != null) {
       core.error(`exitStatus: ${String(workflow.exitStatus)}`);
     }
 
@@ -56,7 +56,7 @@ export function reportWorkflowFailure(
       }
       const label = task.name ?? task.process ?? `task-${String(task.taskId ?? "?")}`;
       core.error(`Failed task: ${label}`);
-      if (task.errorMessage !== undefined) {
+      if (task.errorMessage != null) {
         core.error(task.errorMessage);
       }
       if (task.taskId !== undefined) {

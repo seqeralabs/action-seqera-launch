@@ -4,6 +4,9 @@ import type { ApiListComputeEnvsResponse } from "../types.js";
 export const ListComputeEnvsResponseEntrySchema = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
+  status: Schema.optionalKey(Schema.String),
+  workDir: Schema.optionalKey(Schema.String),
+  primary: Schema.optionalKey(Schema.Boolean),
 });
 
 export type ListComputeEnvsResponseEntry = Schema.Schema.Type<

@@ -32,6 +32,21 @@ const describeFailed = JSON.stringify({
     errorMessage: "boom",
   },
 });
+// Shape returned by the real API for an in-flight run: the nullable error
+// fields are present but null rather than omitted.
+const describeSubmittedWithNulls = JSON.stringify({
+  orgName: "seqera",
+  workspaceName: "demo",
+  workspaceId: 1,
+  workflow: {
+    id: "wf-1",
+    status: "SUBMITTED",
+    errorMessage: null,
+    errorReport: null,
+    exitStatus: null,
+    runName: null,
+  },
+});
 
 describe("monitorWorkflow", () => {
   it("returns immediately for wait none after launch describe", async () => {
@@ -71,6 +86,30 @@ describe("monitorWorkflow", () => {
 
     expect(result.waitOutcome).toBe("running");
     expect(calls).toBeGreaterThan(1);
+  });
+  it("decodes in-flight describe payloads with null error fields", async () => {
+    let calls = 0;
+    const http = new MockHttpClient().when("/workflow/wf-1", () => {
+      calls += 1;
+      const body = calls === 1 ? describeSubmittedWithNulls : describeRunning;
+      return new MockHttpResponse({ statusCode: 200, headers: {} }, body);
+    });
+    const client = testClient(http);
+
+    const result = await Effect.runPromise(
+      monitorWorkflow(
+        client,
+        "https://api.example.com",
+        "wf-1",
+        1,
+        "running",
+        undefined,
+        "ce-1",
+        () => Effect.void,
+      ),
+    );
+
+    expect(result.waitOutcome).toBe("running");
   });
 
   it("fails completion wait on terminal failure", async () => {
