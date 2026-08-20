@@ -1,11 +1,14 @@
 import * as core from "@actions/core";
 import { Effect } from "effect";
-import { createSeqeraClient } from "../api/client.js";
+import { createSeqeraClient, type SeqeraClient } from "../api/client.js";
 import { createWorkflowLaunch, listComputeEnvs } from "../api/endpoints.js";
 import type { ListComputeEnvsResponseEntry } from "../api/schemas/compute-env.js";
 import {
   ComputeEnvAmbiguousError,
   ComputeEnvNotFoundError,
+  ComputeEnvNoPrimaryError,
+  ComputeEnvUnavailableError,
+  WorkDirMissingError,
   WorkflowTerminalFailureError,
 } from "../errors.js";
 import { monitorWorkflow } from "../monitoring/poll.js";
@@ -17,32 +20,54 @@ import {
 import { workspaceRef, workflowWatchUrl } from "../monitoring/workflow-url.js";
 import { readActionInputs } from "./inputs.js";
 import { buildActionOutputOptions, setActionOutputs } from "./outputs.js";
-
 const USER_AGENT = "seqeralabs/action-seqera-launch";
 
-function resolveComputeEnvId(
-  client: ReturnType<typeof createSeqeraClient>,
+export function resolveComputeEnv(
+  client: SeqeraClient,
   workspaceId: number | undefined,
   computeEnvId: string | undefined,
   computeEnvName: string | undefined,
 ) {
   return Effect.gen(function* () {
+    // An explicit id is taken on trust: we cannot look up its work directory
+    // without knowing which workspace listing it belongs to.
     if (computeEnvId !== undefined) {
-      return { computeEnvId, label: computeEnvId };
-    }
-    if (computeEnvName === undefined) {
-      return { computeEnvId: undefined, label: "default primary compute environment" };
+      return { computeEnvId, label: computeEnvId, workDir: undefined };
     }
 
     const listed = yield* listComputeEnvs(client, workspaceId);
-    const matches = (listed.computeEnvs ?? []).filter(
+    const entries = listed.computeEnvs ?? [];
+
+    if (computeEnvName === undefined) {
+      // Launching without a compute environment relies on the workspace having
+      // a primary one. The API answers an empty 403 when it does not, so check
+      // here to produce an actionable message instead.
+      const primary = entries.find((entry: ListComputeEnvsResponseEntry) => entry.primary === true);
+      if (primary === undefined) {
+        return yield* Effect.fail(
+          new ComputeEnvNoPrimaryError({
+            available: entries.map((entry: ListComputeEnvsResponseEntry) => entry.name),
+          }),
+        );
+      }
+      if (primary.status !== undefined && primary.status !== "AVAILABLE") {
+        return yield* Effect.fail(
+          new ComputeEnvUnavailableError({ name: primary.name, status: primary.status }),
+        );
+      }
+      return {
+        computeEnvId: primary.id,
+        label: `${primary.name} (primary)`,
+        workDir: primary.workDir,
+      };
+    }
+
+    const matches = entries.filter(
       (entry: ListComputeEnvsResponseEntry) => entry.name === computeEnvName,
     );
 
     if (matches.length === 0) {
-      const available = (listed.computeEnvs ?? []).map(
-        (entry: ListComputeEnvsResponseEntry) => entry.name,
-      );
+      const available = entries.map((entry: ListComputeEnvsResponseEntry) => entry.name);
       return yield* Effect.fail(
         new ComputeEnvNotFoundError({
           name: computeEnvName,
@@ -62,12 +87,19 @@ function resolveComputeEnvId(
       );
     }
 
-    return { computeEnvId: matches[0]!.id, label: computeEnvName };
+    const match = matches[0]!;
+    if (match.status !== undefined && match.status !== "AVAILABLE") {
+      return yield* Effect.fail(
+        new ComputeEnvUnavailableError({ name: match.name, status: match.status }),
+      );
+    }
+
+    return { computeEnvId: match.id, label: computeEnvName, workDir: match.workDir };
   });
 }
 
 function handleWorkflowTerminalFailure(
-  client: ReturnType<typeof createSeqeraClient>,
+  client: SeqeraClient,
   apiEndpoint: string,
   workflowId: string,
   workspaceId: number | undefined,
@@ -110,7 +142,7 @@ export function runAction() {
       userAgent: USER_AGENT,
     });
 
-    const resolved = yield* resolveComputeEnvId(
+    const resolved = yield* resolveComputeEnv(
       client,
       inputs.workspaceId,
       inputs.computeEnvId,
@@ -120,6 +152,17 @@ export function runAction() {
     const launchRequest = { ...inputs.launch };
     if (resolved.computeEnvId !== undefined) {
       launchRequest.computeEnvId = resolved.computeEnvId;
+    }
+
+    // Fall back to the compute environment's own work directory so a correctly
+    // configured environment does not require the work-dir input.
+    if (launchRequest.workDir === undefined) {
+      if (resolved.workDir !== undefined && resolved.workDir.length > 0) {
+        launchRequest.workDir = resolved.workDir;
+        core.info(`Using compute environment work directory ${resolved.workDir}`);
+      } else if (inputs.computeEnvId === undefined) {
+        return yield* Effect.fail(new WorkDirMissingError({ computeEnv: resolved.label }));
+      }
     }
 
     const launched = yield* createWorkflowLaunch(client, inputs.workspaceId, launchRequest);

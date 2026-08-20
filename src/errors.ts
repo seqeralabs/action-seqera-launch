@@ -26,6 +26,19 @@ export class ComputeEnvAmbiguousError extends Data.TaggedError("ComputeEnvAmbigu
   readonly matches: readonly string[];
 }> {}
 
+export class ComputeEnvNoPrimaryError extends Data.TaggedError("ComputeEnvNoPrimaryError")<{
+  readonly available: readonly string[];
+}> {}
+
+export class ComputeEnvUnavailableError extends Data.TaggedError("ComputeEnvUnavailableError")<{
+  readonly name: string;
+  readonly status: string;
+}> {}
+
+export class WorkDirMissingError extends Data.TaggedError("WorkDirMissingError")<{
+  readonly computeEnv: string;
+}> {}
+
 export class HttpTransientError extends Data.TaggedError("HttpTransientError")<{
   readonly endpoint: string;
   readonly statusCode: number;
@@ -65,11 +78,36 @@ export type ActionError =
   | LaunchValidationError
   | ComputeEnvNotFoundError
   | ComputeEnvAmbiguousError
+  | ComputeEnvNoPrimaryError
+  | ComputeEnvUnavailableError
+  | WorkDirMissingError
   | HttpTransientError
   | HttpResponseError
   | WorkflowTerminalFailureError
   | WorkflowStuckSubmittedError
   | UnknownWorkflowStatusError;
+
+// Keyed by tag so the compiler rejects both missing and unknown entries when
+// an ActionError member is added or removed.
+const ACTION_ERROR_TAG_SET: Record<ActionError["_tag"], true> = {
+  InputValidationError: true,
+  ApiDecodeError: true,
+  LaunchValidationError: true,
+  ComputeEnvNotFoundError: true,
+  ComputeEnvAmbiguousError: true,
+  ComputeEnvNoPrimaryError: true,
+  ComputeEnvUnavailableError: true,
+  WorkDirMissingError: true,
+  HttpTransientError: true,
+  HttpResponseError: true,
+  WorkflowTerminalFailureError: true,
+  WorkflowStuckSubmittedError: true,
+  UnknownWorkflowStatusError: true,
+};
+
+export function isActionErrorTag(tag: string): tag is ActionError["_tag"] {
+  return Object.hasOwn(ACTION_ERROR_TAG_SET, tag);
+}
 
 type WorkflowTerminalFailurePayload = {
   status: string;
@@ -117,6 +155,12 @@ export function formatActionError(error: ActionError): string {
       return `Compute environment '${error.name}' was not found. Available: ${error.available.join(", ") || "(none)"}`;
     case "ComputeEnvAmbiguousError":
       return `Compute environment name '${error.name}' matched multiple environments: ${error.matches.join(", ")}`;
+    case "ComputeEnvNoPrimaryError":
+      return `No compute environment was specified and the workspace has no primary compute environment. Set compute-env or compute-env-id. Available: ${error.available.join(", ") || "(none)"}`;
+    case "ComputeEnvUnavailableError":
+      return `Compute environment '${error.name}' is not available (status ${error.status}).`;
+    case "WorkDirMissingError":
+      return `Compute environment '${error.computeEnv}' has no default work directory. Set the work-dir input.`;
     case "HttpResponseError":
       return `${error.endpoint} returned HTTP ${String(error.statusCode)}: ${error.message}`;
     case "WorkflowTerminalFailureError": {

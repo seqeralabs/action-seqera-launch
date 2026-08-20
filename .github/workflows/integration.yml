@@ -1,7 +1,10 @@
 # Dogfood the action against live Seqera Platform.
 #
-# Required repo secret: SEQERA_ACCESS_TOKEN
-# Optional secrets: SEQERA_WORKSPACE_ID, SEQERA_COMPUTE_ENV, SEQERA_API_ENDPOINT
+# Required repo secrets: SEQERA_ACCESS_TOKEN, SEQERA_WORKSPACE_ID, SEQERA_COMPUTE_ENV
+# Optional secret: SEQERA_API_ENDPOINT
+#
+# No work-dir is passed on purpose: the action falls back to the compute
+# environment's own work directory, which is the path most users hit.
 #
 # Skips fork PRs (no secrets) and forks of this repository.
 
@@ -105,15 +108,27 @@ jobs:
           pipeline: no_pipeline_exists
           stub-run: true
           wait: none
+          # Must match the positive test, otherwise this step fails on a
+          # missing compute environment instead of the invalid pipeline.
+          compute-env: >-
+            ${{ github.event_name == 'workflow_dispatch'
+            && inputs.compute-env
+            || secrets.SEQERA_COMPUTE_ENV }}
           workspace-id: >-
             ${{ github.event_name == 'workflow_dispatch'
             && inputs.workspace-id
             || secrets.SEQERA_WORKSPACE_ID }}
 
       - name: Check invalid pipeline failed
-        if: steps.invalid_launch.outcome == 'success'
         env:
           OUTCOME: ${{ steps.invalid_launch.outcome }}
+          WORKFLOW_ID: ${{ steps.invalid_launch.outputs.workflow-id }}
         run: |
-          echo "Expected invalid pipeline launch to fail, got: $OUTCOME"
-          exit 1
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "Expected invalid pipeline launch to fail, got: $OUTCOME"
+            exit 1
+          fi
+          if [ -n "$WORKFLOW_ID" ]; then
+            echo "Expected no workflow to be launched, got: $WORKFLOW_ID"
+            exit 1
+          fi
