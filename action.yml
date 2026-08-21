@@ -108,3 +108,8 @@ outputs:
 runs:
   using: node24
   main: dist/index.js
+
+# ADR 0007. Green per brand.seqera.net; v2's purple was off-brand.
+branding:
+  icon: play
+  color: green
