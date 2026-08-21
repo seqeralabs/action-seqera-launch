@@ -37,25 +37,27 @@ function parseOptionalInt(value: string | undefined): number | undefined {
   return parsed;
 }
 
+// Actions convention is one item per line; commas stay supported since
+// action-tower-launch used them.
+function splitList(value: string): string[] {
+  return value
+    .split(/[\n,]/)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+}
+
 function parseOptionalBigIntList(value: string | undefined): number[] | undefined {
   if (value === undefined || value.trim().length === 0) {
     return undefined;
   }
-  return value
-    .split(",")
-    .map((part) => part.trim())
-    .filter((part) => part.length > 0)
-    .map((part) => Number.parseInt(part, 10));
+  return splitList(value).map((part) => Number.parseInt(part, 10));
 }
 
 function parseOptionalStringList(value: string | undefined): string[] | undefined {
   if (value === undefined || value.trim().length === 0) {
     return undefined;
   }
-  const items = value
-    .split(",")
-    .map((part) => part.trim())
-    .filter((part) => part.length > 0);
+  const items = splitList(value);
   return items.length === 0 ? undefined : items;
 }
 

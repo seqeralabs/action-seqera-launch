@@ -89,13 +89,13 @@ Only `access-token` is required.
 | `pipeline`           | current repository            | Pipeline to launch.                                                       |
 | `revision`           | —                             | Pipeline revision, branch, tag, or commit.                                |
 | `work-dir`           | compute env's work directory  | Pipeline work directory.                                                  |
-| `parameters`         | —                             | Pipeline parameters as JSON or YAML; sent as `paramsText`.                |
-| `profiles`           | —                             | Comma-separated Nextflow config profiles.                                 |
+| `parameters`         | —                             | Pipeline parameters, as YAML or JSON.                                     |
+| `profiles`           | —                             | Nextflow config profiles, one per line or comma-separated.                |
 | `run-name`           | —                             | Name for the run.                                                         |
-| `nextflow-config`    | —                             | Additional Nextflow config; sent as `configText`.                         |
+| `nextflow-config`    | —                             | Additional Nextflow configuration.                                        |
 | `pre-run-script`     | —                             | Script to run before the pipeline.                                        |
 | `post-run-script`    | —                             | Script to run after the pipeline.                                         |
-| `label-ids`          | —                             | Comma-separated label IDs to attach to the run.                           |
+| `label-ids`          | —                             | Label IDs to attach to the run, one per line or comma-separated.          |
 | `output-dir`         | —                             | Pipeline output directory.                                                |
 | `stub-run`           | —                             | Run the pipeline in stub mode.                                            |
 | `pull-latest`        | —                             | Pull the latest pipeline revision before launching.                       |

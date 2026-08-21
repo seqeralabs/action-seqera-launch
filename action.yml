@@ -36,16 +36,16 @@ inputs:
     description: Pipeline work directory
     required: false
   parameters:
-    description: Pipeline parameters as JSON or YAML; sent as paramsText
+    description: Pipeline parameters, as YAML or JSON
     required: false
   profiles:
-    description: Comma-separated Nextflow config profiles
+    description: Nextflow config profiles, one per line or comma-separated
     required: false
   run-name:
     description: Name for the run
     required: false
   nextflow-config:
-    description: Additional Nextflow config; sent as configText
+    description: Additional Nextflow configuration
     required: false
   pre-run-script:
     description: Script to run before the pipeline
@@ -56,7 +56,7 @@ inputs:
     description: Script to run after the pipeline
     required: false
   label-ids:
-    description: Comma-separated label IDs to attach to the run
+    description: Label IDs to attach to the run, one per line or comma-separated
     required: false
   output-dir:
     description: Pipeline output directory
@@ -74,7 +74,7 @@ inputs:
     description: CPUs for the Nextflow head job
     required: false
   head-job-memory-mb:
-    description: Memory in MB for the Nextflow head job
+    description: Memory for the Nextflow head job, in MB
     required: false
 
   # ADR 0006: enum, not v2's boolean. `running` catches submit-time and

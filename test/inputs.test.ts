@@ -72,6 +72,15 @@ describe("readActionInputs", () => {
     expect(inputs.timeoutMs).toBe(90 * 60_000);
   });
 
+  it("accepts newline-separated lists as well as commas", async () => {
+    process.env.INPUT_PROFILES = "docker\nconda\n";
+    process.env["INPUT_LABEL-IDS"] = "1\n2\n";
+
+    const inputs = await Effect.runPromise(readActionInputs());
+    expect(inputs.launch.configProfiles).toEqual(["docker", "conda"]);
+    expect(inputs.launch.labelIds).toEqual([1, 2]);
+  });
+
   it("rejects invalid timeout values", async () => {
     process.env.INPUT_TIMEOUT = "not-a-duration";
 

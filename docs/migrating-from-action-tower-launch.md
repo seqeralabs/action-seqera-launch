@@ -122,7 +122,7 @@ Nothing here uploads artifacts or comments on pull requests. v2's README showed 
 - `compute-env` is still a name, not an ID, and still falls back to the workspace's primary compute environment.
 - `api-endpoint` still defaults to Seqera Cloud.
 - `parameters` still accepts JSON — and now YAML as well.
-- `profiles` is still a comma-separated string.
+- `profiles` still accepts a comma-separated string — and now one profile per line, which is the usual Actions style for list inputs. Same for `label-ids`.
 
 ## Pinning
 
