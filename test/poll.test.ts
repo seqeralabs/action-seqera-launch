@@ -48,6 +48,13 @@ const describeSubmittedWithNulls = JSON.stringify({
   },
 });
 
+const describeSucceeded = JSON.stringify({
+  orgName: "seqera",
+  workspaceName: "demo",
+  workspaceId: 1,
+  workflow: { id: "wf-1", status: "SUCCEEDED" },
+});
+
 describe("monitorWorkflow", () => {
   it("returns immediately for wait none after launch describe", async () => {
     const http = new MockHttpClient().when(
@@ -86,6 +93,32 @@ describe("monitorWorkflow", () => {
 
     expect(result.waitOutcome).toBe("running");
     expect(calls).toBeGreaterThan(1);
+  });
+
+  // A fast run can already be SUCCEEDED by the first poll. Terminal-status
+  // handling must not treat that as a failure just because we only waited
+  // for the run to start.
+  it("passes running wait when the workflow already succeeded", async () => {
+    const http = new MockHttpClient().when(
+      "/workflow/wf-1",
+      () => new MockHttpResponse({ statusCode: 200, headers: {} }, describeSucceeded),
+    );
+    const client = testClient(http);
+
+    const result = await Effect.runPromise(
+      monitorWorkflow(
+        client,
+        "https://api.example.com",
+        "wf-1",
+        1,
+        "running",
+        undefined,
+        "ce-1",
+        () => Effect.void,
+      ),
+    );
+
+    expect(result.waitOutcome).toBe("running");
   });
   it("decodes in-flight describe payloads with null error fields", async () => {
     let calls = 0;

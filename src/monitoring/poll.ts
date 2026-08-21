@@ -125,6 +125,10 @@ export function monitorWorkflow(
       }
 
       if (wait === "running" && knownStatus !== "SUBMITTED") {
+        if (knownStatus === "SUCCEEDED") {
+          core.info(`Workflow already succeeded: ${url}`);
+          return { describe, waitOutcome: "running" as const } satisfies PollSuccess;
+        }
         if (isTerminalStatus(knownStatus)) {
           return yield* Effect.fail(workflowTerminalFailure(knownStatus, url, describe));
         }
