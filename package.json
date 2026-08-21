@@ -21,7 +21,7 @@
     "@actions/core": "3.0.1",
     "@actions/http-client": "4.0.1",
     "effect": "4.0.0-rc.110",
-    "yaml": "^2.8.1"
+    "yaml": "^2.8.3"
   },
   "devDependencies": {
     "@effect/tsgo": "0.36.5",
