@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "GitHub Action to launch and monitor Seqera Platform workflows",
+  "license": "MPL-2.0",
   "type": "module",
   "scripts": {
     "prepare": "effect-tsgo patch --no-typescript --oxlint",

@@ -4,7 +4,7 @@ Launch and monitor a Nextflow pipeline run on [Seqera Platform](https://seqera.i
 
 This action talks to the Seqera Platform REST API directly. There is no Docker image and no `tw` CLI, so a launch step starts in about a second instead of waiting on a container pull.
 
-Migrating from `seqeralabs/action-tower-launch`? Read [Migrating from action-tower-launch](#migrating-from-action-tower-launch) first — the input names have all changed.
+Migrating from `seqeralabs/action-tower-launch`? Read [Migrating from action-tower-launch](docs/migrating-from-action-tower-launch.md) first — every input and output name has changed.
 
 ## Usage
 
@@ -120,28 +120,9 @@ Only `access-token` is required.
 
 ## Migrating from action-tower-launch
 
-Three changes will break an existing workflow.
+Four things will break an existing workflow: inputs are `kebab-case`, outputs are too (`workflowId` is now `workflow-id`), the `json` output is gone, and `wait` is an enum whose default no longer means fire-and-forget.
 
-**1. Inputs are `kebab-case`.** Every underscore becomes a hyphen:
-
-| `action-tower-launch` | This action       |
-| --------------------- | ----------------- |
-| `access_token`        | `access-token`    |
-| `compute_env`         | `compute-env`     |
-| `workspace_id`        | `workspace-id`    |
-| `api_endpoint`        | `api-endpoint`    |
-| `nextflow_config`     | `nextflow-config` |
-| `pre_run_script`      | `pre-run-script`  |
-| `run_name`            | `run-name`        |
-| `workdir`             | `work-dir`        |
-
-`pipeline`, `revision`, `parameters`, and `profiles` keep their names.
-
-**2. The `json` output is gone.** It exposed the raw API response as a public contract, which pinned us to the Platform's response shape. Use `workflow-id`, `workflow-url`, `status`, and `error-message` instead.
-
-**3. `wait` is an enum, and the default changed.** `wait: true` becomes `wait: completion`. The old default was `false` — fire-and-forget — and the new default is `running`, which waits for the run to start. For the old behaviour, set `wait: none`.
-
-Also removed: the `verbose` input. Set the `ACTIONS_STEP_DEBUG` repository secret to `true` for debug logging, which is how Actions does this generally.
+**[Migrating from action-tower-launch](docs/migrating-from-action-tower-launch.md)** has the complete input and output mapping, a copy-paste diff, and what happened to `verbose` and the `tower_action_*.log`/`.json` files.
 
 ## Development
 
@@ -153,3 +134,7 @@ npm run all      # format:check, lint, lint:types, typecheck, test, build
 `dist/` is committed — GitHub runs the bundled output directly. CI fails if it does not match a fresh build, so run `npm run build` and commit `dist/` with any source change.
 
 Design decisions live in [`docs/decisions/`](docs/decisions/).
+
+## License
+
+[MPL-2.0](LICENSE), matching `action-tower-launch`.
