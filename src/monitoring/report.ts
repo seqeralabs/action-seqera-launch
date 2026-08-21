@@ -133,23 +133,25 @@ export function buildJobSummaryOptions(input: {
 }
 
 export function writeJobSummary(options: JobSummaryOptions) {
-  const summary = core.summary;
-  summary.addHeading("Seqera Platform Launch", 2);
-  summary.addTable([
-    [
-      { data: "Field", header: true },
-      { data: "Value", header: true },
-    ],
-    ["Workflow ID", options.workflowId],
-    ["Workflow URL", options.workflowUrl],
-    ["Workspace", options.workspaceRef],
-    ...(options.status === undefined ? [] : [["Status", options.status]]),
-    ...(options.errorMessage === undefined ? [] : [["Error", options.errorMessage]]),
-  ]);
-  if (options.succeeded) {
-    summary.addRaw("\nLaunch step completed successfully.\n");
-  } else {
-    summary.addRaw("\nLaunch step failed.\n");
-  }
-  return Effect.promise(() => summary.write());
+  return Effect.promise(() => {
+    const summary = core.summary;
+    summary.addHeading("Seqera Platform Launch", 2);
+    summary.addTable([
+      [
+        { data: "Field", header: true },
+        { data: "Value", header: true },
+      ],
+      ["Workflow ID", options.workflowId],
+      ["Workflow URL", options.workflowUrl],
+      ["Workspace", options.workspaceRef],
+      ...(options.status === undefined ? [] : [["Status", options.status]]),
+      ...(options.errorMessage === undefined ? [] : [["Error", options.errorMessage]]),
+    ]);
+    if (options.succeeded) {
+      summary.addRaw("\nLaunch step completed successfully.\n");
+    } else {
+      summary.addRaw("\nLaunch step failed.\n");
+    }
+    return summary.write();
+  });
 }

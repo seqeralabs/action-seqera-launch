@@ -142,7 +142,7 @@ export function runAction(http?: SeqeraHttpTransport) {
         accessToken: inputs.accessToken,
         userAgent: USER_AGENT,
       },
-      ...(http === undefined ? [] : ([http] as const)),
+      http,
     );
 
     const resolved = yield* resolveComputeEnv(
