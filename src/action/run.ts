@@ -1,6 +1,6 @@
 import * as core from "@actions/core";
 import { Effect } from "effect";
-import { createSeqeraClient, type SeqeraClient } from "../api/client.js";
+import { createSeqeraClient, type SeqeraClient, type SeqeraHttpTransport } from "../api/client.js";
 import { createWorkflowLaunch, listComputeEnvs } from "../api/endpoints.js";
 import type { ListComputeEnvsResponseEntry } from "../api/schemas/compute-env.js";
 import {
@@ -133,14 +133,17 @@ function handleWorkflowTerminalFailure(
   });
 }
 
-export function runAction() {
+export function runAction(http?: SeqeraHttpTransport) {
   return Effect.gen(function* () {
     const inputs = yield* readActionInputs();
-    const client = createSeqeraClient({
-      baseUrl: inputs.apiEndpoint,
-      accessToken: inputs.accessToken,
-      userAgent: USER_AGENT,
-    });
+    const client = createSeqeraClient(
+      {
+        baseUrl: inputs.apiEndpoint,
+        accessToken: inputs.accessToken,
+        userAgent: USER_AGENT,
+      },
+      ...(http === undefined ? [] : ([http] as const)),
+    );
 
     const resolved = yield* resolveComputeEnv(
       client,
