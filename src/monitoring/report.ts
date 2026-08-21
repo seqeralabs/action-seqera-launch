@@ -132,6 +132,9 @@ export function buildJobSummaryOptions(input: {
   };
 }
 
+// core.summary's add* helpers only append to an in-memory buffer; write()
+// is what appends to GITHUB_STEP_SUMMARY. Without it the summary ADR 0006
+// promises never renders.
 export function writeJobSummary(options: JobSummaryOptions) {
   const summary = core.summary;
   summary.addHeading("Seqera Platform Launch", 2);
@@ -151,4 +154,14 @@ export function writeJobSummary(options: JobSummaryOptions) {
   } else {
     summary.addRaw("\nLaunch step failed.\n");
   }
+  // A summary that cannot be written must not fail the launch it is
+  // reporting on, so failures are logged and swallowed.
+  return Effect.promise(() => summary.write()).pipe(
+    Effect.catchDefect((defect) =>
+      Effect.sync(() => {
+        core.warning(`Could not write the job summary: ${String(defect)}`);
+      }),
+    ),
+    Effect.asVoid,
+  );
 }

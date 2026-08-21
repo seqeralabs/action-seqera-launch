@@ -1,8 +1,53 @@
 import { describe, expect, it } from "vitest";
 import { Effect } from "effect";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createSeqeraClient } from "../src/api/client.js";
-import { buildJobSummaryOptions, reportWorkflowFailure } from "../src/monitoring/report.js";
+import {
+  buildJobSummaryOptions,
+  reportWorkflowFailure,
+  writeJobSummary,
+} from "../src/monitoring/report.js";
 import { MockHttpClient, MockHttpResponse } from "./helpers/mock-http.js";
+
+describe("writeJobSummary", () => {
+  // The add* helpers only fill an in-memory buffer, so assert against the
+  // file the runner actually renders rather than against the call.
+  it("flushes the summary to GITHUB_STEP_SUMMARY", async () => {
+    const path = join(mkdtempSync(join(tmpdir(), "summary-")), "summary.md");
+    writeFileSync(path, "");
+    const previous = process.env.GITHUB_STEP_SUMMARY;
+    process.env.GITHUB_STEP_SUMMARY = path;
+
+    try {
+      await Effect.runPromise(
+        writeJobSummary(
+          buildJobSummaryOptions({
+            workflowId: "wf-9",
+            workflowUrl: "https://example.com/watch/9",
+            workspaceRef: "org/ws",
+            status: "FAILED",
+            errorMessage: "boom",
+            succeeded: false,
+          }),
+        ),
+      );
+
+      const written = readFileSync(path, "utf8");
+      expect(written).toContain("Seqera Platform Launch");
+      expect(written).toContain("wf-9");
+      expect(written).toContain("boom");
+      expect(written).toContain("Launch step failed.");
+    } finally {
+      if (previous === undefined) {
+        delete process.env.GITHUB_STEP_SUMMARY;
+      } else {
+        process.env.GITHUB_STEP_SUMMARY = previous;
+      }
+    }
+  });
+});
 
 describe("buildJobSummaryOptions", () => {
   it("includes status and error message when both are present", () => {

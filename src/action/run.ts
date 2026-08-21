@@ -120,7 +120,7 @@ function handleWorkflowTerminalFailure(
 
     const orgName = error.describe.orgName ?? "unknown-org";
     const workspaceName = error.describe.workspaceName ?? "unknown-workspace";
-    writeJobSummary(
+    yield* writeJobSummary(
       buildJobSummaryOptions({
         workflowId,
         workflowUrl: error.workflowUrl,
@@ -206,7 +206,7 @@ export function runAction() {
       }),
     );
 
-    writeJobSummary(
+    yield* writeJobSummary(
       buildJobSummaryOptions({
         workflowId,
         workflowUrl: url,
