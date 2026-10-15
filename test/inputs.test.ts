@@ -56,6 +56,34 @@ describe("readActionInputs", () => {
     expect(inputs.launch.stubRun).toBe(true);
   });
 
+  it.each(["v1", "v2"])("selects the %s Nextflow parser", async (parser) => {
+    process.env["INPUT_SYNTAX-PARSER"] = parser;
+    process.env["INPUT_PRE-RUN-SCRIPT"] = "echo setup";
+
+    const inputs = await Effect.runPromise(readActionInputs());
+    expect(inputs.launch.syntaxParser).toBe(parser);
+    expect(inputs.launch.preRunScript).toBe("echo setup");
+  });
+
+  it.each([undefined, "", "   "])("omits an unset parser (%s)", async (parser) => {
+    if (parser !== undefined) {
+      process.env["INPUT_SYNTAX-PARSER"] = parser;
+    }
+
+    const inputs = await Effect.runPromise(readActionInputs());
+    expect(inputs.launch).not.toHaveProperty("syntaxParser");
+  });
+
+  it.each(["v3", "V2", "true"])("rejects invalid parser %s", async (parser) => {
+    process.env["INPUT_SYNTAX-PARSER"] = parser;
+
+    await expect(Effect.runPromise(readActionInputs())).rejects.toMatchObject({
+      _tag: "InputValidationError",
+      input: "syntax-parser",
+      message: `must be one of v1, v2; got '${parser}'`,
+    });
+  });
+
   it("returns a readable URL validation error", async () => {
     process.env["INPUT_API-ENDPOINT"] = "not-a-url";
 

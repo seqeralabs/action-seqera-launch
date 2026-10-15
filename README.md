@@ -100,12 +100,28 @@ Only `access-token` is required.
 | `stub-run`           | —                             | Run the pipeline in stub mode.                                            |
 | `pull-latest`        | —                             | Pull the latest pipeline revision before launching.                       |
 | `nextflow-version`   | —                             | Nextflow version to use.                                                  |
+| `syntax-parser`      | —                             | Nextflow syntax parser, `v1` or `v2`. Omit to use the default.            |
 | `head-job-cpus`      | —                             | CPUs for the Nextflow head job.                                           |
 | `head-job-memory-mb` | —                             | Memory in MB for the Nextflow head job.                                   |
 | `wait`               | `running`                     | `running`, `completion`, or `none`. See [Waiting](#waiting).              |
 | `timeout`            | —                             | Max time to wait, e.g. `90m`. Unset polls until the job's own time limit. |
 
 `resume` and `session-id` are deliberately not exposed. Resuming a run from CI needs a session id carried between workflow runs, which is a design question in its own right.
+
+### Nextflow v2 parser
+
+Set `syntax-parser: v2` to enable Nextflow's [strict syntax](https://www.nextflow.io/docs/latest/strict-syntax.html):
+
+```yaml
+- uses: seqeralabs/action-seqera-launch@v1
+  with:
+    access-token: ${{ secrets.SEQERA_ACCESS_TOKEN }}
+    compute-env: my-compute-env
+    syntax-parser: v2
+    nextflow-version: "25.10.0"
+```
+
+The action sends the selection as the Platform API's `syntaxParser` launch field, so the Platform endpoint must support that field. No `pre-run-script` export is needed. Strict syntax requires Nextflow 25.04.0 or later and is the default from 26.04.0. Use `syntax-parser: v1` to explicitly select the legacy parser. Leaving the input unset preserves the existing launch defaults; the action does not select or upgrade the Nextflow version for you.
 
 ## Outputs
 

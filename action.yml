@@ -70,6 +70,9 @@ inputs:
   nextflow-version:
     description: Nextflow version to use
     required: false
+  syntax-parser:
+    description: Nextflow syntax parser, v1 or v2; omit to use the default
+    required: false
   head-job-cpus:
     description: CPUs for the Nextflow head job
     required: false

@@ -17,6 +17,7 @@ export interface ActionInputs {
 }
 
 const WaitModeSchema = Schema.Literals(["none", "running", "completion"]);
+const SyntaxParserSchema = Schema.Literals(["v1", "v2"]);
 
 function optionalBooleanInput(name: string): boolean | undefined {
   const raw = core.getInput(name);
@@ -284,13 +285,28 @@ export function readActionInputs(): Effect.Effect<ActionInputs, InputValidationE
       );
     }
 
+    const launch = buildLaunchRequest();
+    const syntaxParserRaw = core.getInput("syntax-parser");
+    if (syntaxParserRaw.length > 0) {
+      const syntaxParserResult = Schema.decodeUnknownResult(SyntaxParserSchema)(syntaxParserRaw);
+      if (Result.isFailure(syntaxParserResult)) {
+        return yield* Effect.fail(
+          new InputValidationError({
+            input: "syntax-parser",
+            message: `must be one of v1, v2; got '${syntaxParserRaw}'`,
+          }),
+        );
+      }
+      launch.syntaxParser = syntaxParserResult.success;
+    }
+
     return {
       accessToken,
       apiEndpoint,
       workspaceId,
       computeEnvId,
       computeEnvName,
-      launch: buildLaunchRequest(),
+      launch,
       wait,
       timeoutMs,
     };
