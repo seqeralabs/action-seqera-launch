@@ -149,6 +149,10 @@ npm run all      # format:check, lint, lint:types, typecheck, test, build
 
 `dist/` is committed — GitHub runs the bundled output directly. CI fails if it does not match a fresh build, so run `npm run build` and commit `dist/` with any source change.
 
+Run `npm run verify` after building to execute the bundled action against local HTTP fixtures, without Seqera credentials or cloud jobs. It checks launch payloads, compute selection, wait modes, failure diagnostics, and Actions output files. Use `npm run verify -- doctor` to inspect the bundle and runtime, or `npm run verify -- primary` for one scenario.
+
+The project-local [verification skill](.agents/skills/verifying-seqera-launch/SKILL.md) includes setup, cleanup, and a feature map. Evidence is saved under `.amp/in/artifacts/verify-seqera-*/`; locally, exclude `/.amp/in/` in the file returned by `git rev-parse --git-path info/exclude`. CI runs the same command against the committed bundle and uploads evidence for seven days. The existing live integration workflow remains separate.
+
 Design decisions live in [`docs/decisions/`](docs/decisions/).
 
 ## License
