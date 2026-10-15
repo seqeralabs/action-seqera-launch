@@ -27,15 +27,24 @@ function optionalBooleanInput(name: string): boolean | undefined {
   return core.getBooleanInput(name);
 }
 
-function parseOptionalInt(value: string | undefined): number | undefined {
-  if (value === undefined || value.trim().length === 0) {
-    return undefined;
+function parseInteger(value: string, input: string): Effect.Effect<number, InputValidationError> {
+  const parsed = Number(value);
+  if (!/^[+-]?\d+$/.test(value.trim()) || !Number.isSafeInteger(parsed)) {
+    return Effect.fail(
+      new InputValidationError({
+        input,
+        message: `must be a safe integer, got '${value}'`,
+      }),
+    );
   }
-  const parsed = Number.parseInt(value, 10);
-  if (Number.isNaN(parsed)) {
-    return undefined;
-  }
-  return parsed;
+  return Effect.succeed(parsed);
+}
+
+function optionalIntegerInput(
+  name: string,
+): Effect.Effect<number | undefined, InputValidationError> {
+  const value = core.getInput(name);
+  return value.trim().length === 0 ? Effect.succeed(undefined) : parseInteger(value, name);
 }
 
 // Actions convention is one item per line; commas stay supported since
@@ -45,13 +54,6 @@ function splitList(value: string): string[] {
     .split(/[\n,]/)
     .map((part) => part.trim())
     .filter((part) => part.length > 0);
-}
-
-function parseOptionalBigIntList(value: string | undefined): number[] | undefined {
-  if (value === undefined || value.trim().length === 0) {
-    return undefined;
-  }
-  return splitList(value).map((part) => Number.parseInt(part, 10));
 }
 
 function parseOptionalStringList(value: string | undefined): string[] | undefined {
@@ -178,11 +180,6 @@ function buildLaunchRequest(): ApiWorkflowLaunchRequest {
     launch.postRunScript = postRunScript;
   }
 
-  const labelIds = parseOptionalBigIntList(core.getInput("label-ids"));
-  if (labelIds !== undefined) {
-    launch.labelIds = labelIds;
-  }
-
   const outputDir = core.getInput("output-dir");
   if (outputDir.trim().length > 0) {
     launch.outputDir = outputDir;
@@ -203,16 +200,6 @@ function buildLaunchRequest(): ApiWorkflowLaunchRequest {
     launch.nextflowVersion = nextflowVersion;
   }
 
-  const headJobCpus = parseOptionalInt(core.getInput("head-job-cpus"));
-  if (headJobCpus !== undefined) {
-    launch.headJobCpus = headJobCpus;
-  }
-
-  const headJobMemoryMb = parseOptionalInt(core.getInput("head-job-memory-mb"));
-  if (headJobMemoryMb !== undefined) {
-    launch.headJobMemoryMb = headJobMemoryMb;
-  }
-
   return launch;
 }
 
@@ -231,17 +218,7 @@ export function readActionInputs(): Effect.Effect<ActionInputs, InputValidationE
     const apiEndpointRaw = core.getInput("api-endpoint") || "https://api.cloud.seqera.io";
     const apiEndpoint = yield* validateUrl(apiEndpointRaw, "api-endpoint");
 
-    const workspaceRaw = core.getInput("workspace-id");
-    const workspaceId =
-      workspaceRaw.trim().length === 0 ? undefined : parseOptionalInt(workspaceRaw.trim());
-    if (workspaceRaw.trim().length > 0 && workspaceId === undefined) {
-      return yield* Effect.fail(
-        new InputValidationError({
-          input: "workspace-id",
-          message: `must be a numeric id, got '${workspaceRaw}'`,
-        }),
-      );
-    }
+    const workspaceId = yield* optionalIntegerInput("workspace-id");
 
     const computeEnvIdRaw = core.getInput("compute-env-id").trim();
     const computeEnvNameRaw = core.getInput("compute-env").trim();
@@ -286,6 +263,20 @@ export function readActionInputs(): Effect.Effect<ActionInputs, InputValidationE
     }
 
     const launch = buildLaunchRequest();
+    const labelIdsRaw = core.getInput("label-ids");
+    if (labelIdsRaw.trim().length > 0) {
+      launch.labelIds = yield* Effect.forEach(splitList(labelIdsRaw), (value) =>
+        parseInteger(value, "label-ids"),
+      );
+    }
+    const headJobCpus = yield* optionalIntegerInput("head-job-cpus");
+    if (headJobCpus !== undefined) {
+      launch.headJobCpus = headJobCpus;
+    }
+    const headJobMemoryMb = yield* optionalIntegerInput("head-job-memory-mb");
+    if (headJobMemoryMb !== undefined) {
+      launch.headJobMemoryMb = headJobMemoryMb;
+    }
     const syntaxParserRaw = core.getInput("syntax-parser");
     if (syntaxParserRaw.length > 0) {
       const syntaxParserResult = Schema.decodeUnknownResult(SyntaxParserSchema)(syntaxParserRaw);
