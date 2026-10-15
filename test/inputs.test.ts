@@ -56,6 +56,70 @@ describe("readActionInputs", () => {
     expect(inputs.launch.stubRun).toBe(true);
   });
 
+  it("preserves valid integers and list separators", async () => {
+    process.env["INPUT_WORKSPACE-ID"] = " 9007199254740991 ";
+    process.env["INPUT_HEAD-JOB-CPUS"] = "02";
+    process.env["INPUT_HEAD-JOB-MEMORY-MB"] = "+4096";
+    process.env["INPUT_LABEL-IDS"] = "1, 2\n9007199254740991\n";
+
+    const inputs = await Effect.runPromise(readActionInputs());
+    expect(inputs.workspaceId).toBe(Number.MAX_SAFE_INTEGER);
+    expect(inputs.launch.headJobCpus).toBe(2);
+    expect(inputs.launch.headJobMemoryMb).toBe(4096);
+    expect(inputs.launch.labelIds).toEqual([1, 2, Number.MAX_SAFE_INTEGER]);
+  });
+
+  it.each(["workspace-id", "head-job-cpus", "head-job-memory-mb", "label-ids"])(
+    "rejects malformed and unsafe integers in %s",
+    async (input) => {
+      for (const value of [
+        "123oops",
+        "2.5",
+        "abc",
+        "9007199254740992",
+        "1e3",
+        "0x10",
+        "Infinity",
+      ]) {
+        process.env[`INPUT_${input.toUpperCase()}`] = value;
+
+        await expect(Effect.runPromise(readActionInputs())).rejects.toMatchObject({
+          _tag: "InputValidationError",
+          input,
+          message: `must be a safe integer, got '${value}'`,
+        });
+      }
+    },
+  );
+
+  it.each(["1,abc", "1\n2.5", "1,9007199254740992"])(
+    "rejects a malformed item in label-ids (%s)",
+    async (value) => {
+      process.env["INPUT_LABEL-IDS"] = value;
+
+      await expect(Effect.runPromise(readActionInputs())).rejects.toMatchObject({
+        _tag: "InputValidationError",
+        input: "label-ids",
+      });
+    },
+  );
+
+  it.each([undefined, "", "   "])("omits unset integer inputs (%s)", async (value) => {
+    for (const input of ["WORKSPACE-ID", "HEAD-JOB-CPUS", "HEAD-JOB-MEMORY-MB", "LABEL-IDS"]) {
+      if (value === undefined) {
+        delete process.env[`INPUT_${input}`];
+      } else {
+        process.env[`INPUT_${input}`] = value;
+      }
+    }
+
+    const inputs = await Effect.runPromise(readActionInputs());
+    expect(inputs.workspaceId).toBeUndefined();
+    expect(inputs.launch).not.toHaveProperty("headJobCpus");
+    expect(inputs.launch).not.toHaveProperty("headJobMemoryMb");
+    expect(inputs.launch).not.toHaveProperty("labelIds");
+  });
+
   it.each(["v1", "v2"])("selects the %s Nextflow parser", async (parser) => {
     process.env["INPUT_SYNTAX-PARSER"] = parser;
     process.env["INPUT_PRE-RUN-SCRIPT"] = "echo setup";
