@@ -18,6 +18,19 @@ Migrating from `seqeralabs/action-tower-launch`? Read [Migrating from action-tow
 
 That launches the current repository, waits until the run reaches `RUNNING`, and then finishes green.
 
+To save the launch configuration in the workspace Launchpad, set `launchpad-name`:
+
+```yaml
+- uses: seqeralabs/action-seqera-launch@v1
+  with:
+    access-token: ${{ secrets.SEQERA_ACCESS_TOKEN }}
+    workspace-id: "123456789"
+    compute-env: my-compute-env
+    launchpad-name: my-pipeline
+```
+
+The action creates the named pipeline if absent, or updates its default version if present, then launches that saved version. It matches the name exactly within the workspace. Omit the input to launch directly without changing the Launchpad. The token needs permission to create or update pipelines in the workspace.
+
 A fuller example, pinning a revision and passing parameters:
 
 ```yaml
@@ -87,6 +100,7 @@ Only `access-token` is required.
 | `compute-env-id`     | —                             | Compute environment ID to launch into.                                    |
 | `compute-env`        | —                             | Compute environment name. Ignored when `compute-env-id` is set.           |
 | `pipeline`           | current repository            | Pipeline to launch.                                                       |
+| `launchpad-name`     | —                             | Save or update this named Launchpad pipeline, then launch its version.    |
 | `revision`           | —                             | Pipeline revision, branch, tag, or commit.                                |
 | `work-dir`           | compute env's work directory  | Pipeline work directory.                                                  |
 | `parameters`         | —                             | Pipeline parameters, as YAML or JSON.                                     |

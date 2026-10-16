@@ -47,4 +47,8 @@ export class MockHttpClient implements SeqeraHttpTransport {
   post(url: string, data: string, _headers: Record<string, string>): Promise<SeqeraHttpResponse> {
     return this.dispatch(url, "POST", data);
   }
+
+  put(url: string, data: string, _headers: Record<string, string>): Promise<SeqeraHttpResponse> {
+    return this.dispatch(url, "PUT", data);
+  }
 }

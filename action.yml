@@ -29,6 +29,9 @@ inputs:
     description: Pipeline to launch
     required: false
     default: https://github.com/${{ github.repository }}
+  launchpad-name:
+    description: Save or update this named pipeline in the workspace Launchpad before launching
+    required: false
   revision:
     description: Pipeline revision, branch, tag, or commit
     required: false
