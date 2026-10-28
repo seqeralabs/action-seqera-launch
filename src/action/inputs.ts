@@ -29,7 +29,7 @@ function optionalBooleanInput(name: string): boolean | undefined {
 
 function parseInteger(value: string, input: string): Effect.Effect<number, InputValidationError> {
   const parsed = Number(value);
-  if (!/^[+-]?\d+$/.test(value.trim()) || !Number.isSafeInteger(parsed)) {
+  if (!/^[+-]?\d+$/u.test(value.trim()) || !Number.isSafeInteger(parsed)) {
     return Effect.fail(
       new InputValidationError({
         input,
@@ -43,8 +43,10 @@ function parseInteger(value: string, input: string): Effect.Effect<number, Input
 function optionalIntegerInput(
   name: string,
 ): Effect.Effect<number | undefined, InputValidationError> {
-  const value = core.getInput(name);
-  return value.trim().length === 0 ? Effect.succeed(undefined) : parseInteger(value, name);
+  return Effect.gen(function* () {
+    const value = core.getInput(name);
+    return value.trim().length === 0 ? undefined : yield* parseInteger(value, name);
+  });
 }
 
 // Actions convention is one item per line; commas stay supported since
