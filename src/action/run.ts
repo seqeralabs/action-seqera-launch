@@ -1,7 +1,8 @@
 import * as core from "@actions/core";
 import { Effect } from "effect";
 import { createSeqeraClient, type SeqeraClient } from "../api/client.js";
-import { createWorkflowLaunch, listComputeEnvs, saveLaunchpadPipeline } from "../api/endpoints.js";
+import { createWorkflowLaunch, listComputeEnvs } from "../api/endpoints.js";
+import { saveLaunchpadPipeline } from "../api/launchpad.js";
 import type { ListComputeEnvsResponseEntry } from "../api/schemas/compute-env.js";
 import {
   ComputeEnvAmbiguousError,

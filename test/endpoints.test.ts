@@ -1,11 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { Effect } from "effect";
 import { createSeqeraClient } from "../src/api/client.js";
-import {
-  createWorkflowLaunch,
-  listComputeEnvs,
-  saveLaunchpadPipeline,
-} from "../src/api/endpoints.js";
+import { createWorkflowLaunch, listComputeEnvs } from "../src/api/endpoints.js";
+import { saveLaunchpadPipeline } from "../src/api/launchpad.js";
 import { DescribeWorkflowResponseSchema } from "../src/api/schemas/workflow.js";
 import {
   ComputeEnvAmbiguousError,
@@ -14,16 +11,31 @@ import {
 } from "../src/errors.js";
 import { MockHttpClient, MockHttpResponse } from "./helpers/mock-http.js";
 
+interface RecordedRequest {
+  readonly url: string;
+  readonly method: string;
+  readonly body: unknown;
+}
+
+interface SaveCase {
+  readonly existing: boolean;
+  readonly method: string;
+  readonly pipelineId: number;
+  readonly versionId: string;
+}
+
+const saveCases: readonly SaveCase[] = [
+  { existing: false, method: "POST", pipelineId: 17, versionId: "v-new" },
+  { existing: true, method: "PUT", pipelineId: 42, versionId: "v-updated" },
+];
+
 describe("API endpoints", () => {
-  it.each([
-    { existing: false, method: "POST", pipelineId: 17, versionId: "v-new" },
-    { existing: true, method: "PUT", pipelineId: 42, versionId: "v-updated" },
-  ])(
+  it.each(saveCases)(
     "saves and resolves a Launchpad version ($method)",
     async ({ existing, method, pipelineId, versionId }) => {
-      const requests: Array<{ url: string; method: string; body: unknown }> = [];
+      const requests: RecordedRequest[] = [];
       const http = new MockHttpClient()
-        .when(/\/pipelines\?.*attributes=labels/, (url, requestMethod) => {
+        .when(/\/pipelines\?.*attributes=labels/u, (url, requestMethod) => {
           requests.push({ url, method: requestMethod, body: undefined });
           return new MockHttpResponse(
             { statusCode: 200, headers: {} },

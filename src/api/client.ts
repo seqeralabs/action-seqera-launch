@@ -74,10 +74,12 @@ export interface SeqeraHttpResponse {
   readBody(): Promise<string>;
 }
 
+type HttpHeaders = Readonly<Record<string, string>>;
+
 export interface SeqeraHttpTransport {
-  get(url: string, headers: Record<string, string>): Promise<SeqeraHttpResponse>;
-  post(url: string, data: string, headers: Record<string, string>): Promise<SeqeraHttpResponse>;
-  put(url: string, data: string, headers: Record<string, string>): Promise<SeqeraHttpResponse>;
+  get(url: string, headers: HttpHeaders): Promise<SeqeraHttpResponse>;
+  post(url: string, data: string, headers: HttpHeaders): Promise<SeqeraHttpResponse>;
+  put(url: string, data: string, headers: HttpHeaders): Promise<SeqeraHttpResponse>;
 }
 
 function isTransientStatus(statusCode: number): boolean {
@@ -242,4 +244,4 @@ export function createSeqeraClient(
   return { requestJson, config };
 }
 
-export type SeqeraClient = ReturnType<typeof createSeqeraClient>;
+export type SeqeraClient = Readonly<ReturnType<typeof createSeqeraClient>>;
