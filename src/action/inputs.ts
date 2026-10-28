@@ -11,6 +11,7 @@ export interface ActionInputs {
   readonly workspaceId: number | undefined;
   readonly computeEnvId: string | undefined;
   readonly computeEnvName: string | undefined;
+  readonly launchpadName: string | undefined;
   readonly launch: ApiWorkflowLaunchRequest;
   readonly wait: WaitMode;
   readonly timeoutMs: number | undefined;
@@ -226,6 +227,8 @@ export function readActionInputs(): Effect.Effect<ActionInputs, InputValidationE
     const computeEnvNameRaw = core.getInput("compute-env").trim();
     const computeEnvId = computeEnvIdRaw.length > 0 ? computeEnvIdRaw : undefined;
     const computeEnvName = computeEnvNameRaw.length > 0 ? computeEnvNameRaw : undefined;
+    const launchpadNameRaw = core.getInput("launchpad-name").trim();
+    const launchpadName = launchpadNameRaw.length > 0 ? launchpadNameRaw : undefined;
 
     const waitRaw = core.getInput("wait") || "running";
     const waitResult = Schema.decodeUnknownResult(WaitModeSchema)(waitRaw);
@@ -299,6 +302,7 @@ export function readActionInputs(): Effect.Effect<ActionInputs, InputValidationE
       workspaceId,
       computeEnvId,
       computeEnvName,
+      launchpadName,
       launch,
       wait,
       timeoutMs,

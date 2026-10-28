@@ -2,6 +2,7 @@ import * as core from "@actions/core";
 import { Effect } from "effect";
 import { createSeqeraClient, type SeqeraClient } from "../api/client.js";
 import { createWorkflowLaunch, listComputeEnvs } from "../api/endpoints.js";
+import { saveLaunchpadPipeline } from "../api/launchpad.js";
 import type { ListComputeEnvsResponseEntry } from "../api/schemas/compute-env.js";
 import {
   ComputeEnvAmbiguousError,
@@ -163,6 +164,16 @@ export function runAction() {
       } else if (inputs.computeEnvId === undefined) {
         return yield* new WorkDirMissingError({ computeEnv: resolved.label });
       }
+    }
+
+    if (inputs.launchpadName !== undefined) {
+      launchRequest.id = yield* saveLaunchpadPipeline(
+        client,
+        inputs.workspaceId,
+        inputs.launchpadName,
+        launchRequest,
+      );
+      core.info(`Saved Launchpad pipeline '${inputs.launchpadName}'`);
     }
 
     const launched = yield* createWorkflowLaunch(client, inputs.workspaceId, launchRequest);

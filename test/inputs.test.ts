@@ -56,6 +56,12 @@ describe("readActionInputs", () => {
     expect(inputs.launch.stubRun).toBe(true);
   });
 
+  it("enables Launchpad saving only when a name is given", async () => {
+    expect((await Effect.runPromise(readActionInputs())).launchpadName).toBeUndefined();
+    process.env["INPUT_LAUNCHPAD-NAME"] = "  demo  ";
+    expect((await Effect.runPromise(readActionInputs())).launchpadName).toBe("demo");
+  });
+
   it("preserves valid integers and list separators", async () => {
     process.env["INPUT_WORKSPACE-ID"] = " 9007199254740991 ";
     process.env["INPUT_HEAD-JOB-CPUS"] = "02";

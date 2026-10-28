@@ -53,7 +53,7 @@ function launchQuery(workspaceId: number | undefined) {
   return workspaceId === undefined ? undefined : { workspaceId: String(workspaceId) };
 }
 
-function workspaceQuery(workspaceId: number | undefined) {
+export function workspaceQuery(workspaceId: number | undefined) {
   return workspaceId === undefined ? undefined : { workspaceId };
 }
 

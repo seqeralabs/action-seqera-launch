@@ -40,11 +40,23 @@ export class MockHttpClient implements SeqeraHttpTransport {
     return Promise.resolve(new MockHttpResponse({ statusCode: 404, headers: {} }, "not found"));
   }
 
-  get(url: string, _headers: Record<string, string>): Promise<SeqeraHttpResponse> {
+  get(url: string, _headers: Readonly<Record<string, string>>): Promise<SeqeraHttpResponse> {
     return this.dispatch(url, "GET");
   }
 
-  post(url: string, data: string, _headers: Record<string, string>): Promise<SeqeraHttpResponse> {
+  post(
+    url: string,
+    data: string,
+    _headers: Readonly<Record<string, string>>,
+  ): Promise<SeqeraHttpResponse> {
     return this.dispatch(url, "POST", data);
+  }
+
+  put(
+    url: string,
+    data: string,
+    _headers: Readonly<Record<string, string>>,
+  ): Promise<SeqeraHttpResponse> {
+    return this.dispatch(url, "PUT", data);
   }
 }

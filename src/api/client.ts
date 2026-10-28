@@ -11,10 +11,11 @@ export interface SeqeraClientConfig {
 }
 
 export interface RequestOptions {
-  readonly method: "GET" | "POST";
+  readonly method: "GET" | "POST" | "PUT";
   readonly path: string;
   readonly query?: Record<string, string | number | undefined> | undefined;
   readonly body?: unknown;
+  readonly retryTransient?: boolean;
 }
 
 const transportRetrySchedule = Schedule.exponential("1 second").pipe(
@@ -73,9 +74,12 @@ export interface SeqeraHttpResponse {
   readBody(): Promise<string>;
 }
 
+type HttpHeaders = Readonly<Record<string, string>>;
+
 export interface SeqeraHttpTransport {
-  get(url: string, headers: Record<string, string>): Promise<SeqeraHttpResponse>;
-  post(url: string, data: string, headers: Record<string, string>): Promise<SeqeraHttpResponse>;
+  get(url: string, headers: HttpHeaders): Promise<SeqeraHttpResponse>;
+  post(url: string, data: string, headers: HttpHeaders): Promise<SeqeraHttpResponse>;
+  put(url: string, data: string, headers: HttpHeaders): Promise<SeqeraHttpResponse>;
 }
 
 function isTransientStatus(statusCode: number): boolean {
@@ -87,6 +91,7 @@ function defaultHttpTransport(): SeqeraHttpTransport {
   return {
     get: (url, headers) => client.get(url, headers),
     post: (url, data, headers) => client.post(url, data, headers),
+    put: (url, data, headers) => client.put(url, data, headers),
   };
 }
 
@@ -115,6 +120,8 @@ export function createSeqeraClient(
               return http.get(url, headers);
             case "POST":
               return http.post(url, requestBody ?? "", headers);
+            case "PUT":
+              return http.put(url, requestBody ?? "", headers);
             default: {
               const _exhaustive: never = options.method;
               throw new Error(`Unsupported HTTP method: ${String(_exhaustive)}`);
@@ -212,7 +219,7 @@ export function createSeqeraClient(
       const endpoint = `${options.method} ${options.path}`;
       const payload: JsonValue | Record<string, never> = yield* requestOnce(options).pipe(
         Effect.retry({
-          while: (error) => error._tag === "HttpTransientError",
+          while: (error) => options.retryTransient !== false && error._tag === "HttpTransientError",
           schedule: transportRetrySchedule,
         }),
         Effect.catchTag("HttpTransientError", (error) =>
@@ -237,4 +244,4 @@ export function createSeqeraClient(
   return { requestJson, config };
 }
 
-export type SeqeraClient = ReturnType<typeof createSeqeraClient>;
+export type SeqeraClient = Readonly<ReturnType<typeof createSeqeraClient>>;
