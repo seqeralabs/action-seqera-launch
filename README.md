@@ -18,18 +18,26 @@ Migrating from `seqeralabs/action-tower-launch`? Read [Migrating from action-tow
 
 That launches the current repository, waits until the run reaches `RUNNING`, and then finishes green.
 
-To save the launch configuration in the workspace Launchpad, set `launchpad-name`:
+To launch through a workspace Launchpad pipeline, set `launchpad-name`:
 
 ```yaml
 - uses: seqeralabs/action-seqera-launch@v1
   with:
     access-token: ${{ secrets.SEQERA_ACCESS_TOKEN }}
     workspace-id: "123456789"
-    compute-env: my-compute-env
     launchpad-name: my-pipeline
+    revision: ${{ github.sha }}
 ```
 
-The action creates the named pipeline if absent, or updates its default version if present, then launches that saved version. It matches the name exactly within the workspace. Omit the input to launch directly without changing the Launchpad. The token needs permission to create or update pipelines in the workspace.
+If the named pipeline exists, its saved launch is the base configuration and the action's inputs overlay it for this run only. The action never writes to an existing pipeline, so settings you keep in the Launchpad (a plugin config, a compute environment, secrets) survive every run. Overlay rules:
+
+- `nextflow-config` is appended after the saved config, so its settings win.
+- `parameters` are merged key by key into the saved parameters; the action's keys win.
+- Any other input replaces the saved value when set, and leaves it alone when not. `compute-env` and `compute-env-id` replace the saved compute environment; `compute-env` also brings its work directory.
+
+Unset `revision` means the saved revision, so set `revision: ${{ github.sha }}` to test each commit. `pipeline` defaults to the current repository and always overrides the saved one; the action warns when they differ.
+
+If the named pipeline does not exist, the action creates it from its inputs and launches it. The name must match exactly within the workspace. The token needs permission to read pipelines, and to create them if the pipeline may be missing.
 
 A fuller example, pinning a revision and passing parameters:
 
@@ -100,7 +108,7 @@ Only `access-token` is required.
 | `compute-env-id`     | —                             | Compute environment ID to launch into.                                    |
 | `compute-env`        | —                             | Compute environment name. Ignored when `compute-env-id` is set.           |
 | `pipeline`           | current repository            | Pipeline to launch.                                                       |
-| `launchpad-name`     | —                             | Save or update this named Launchpad pipeline, then launch its version.    |
+| `launchpad-name`     | —                             | Launch this Launchpad pipeline with inputs overlaid; create it if absent. |
 | `revision`           | —                             | Pipeline revision, branch, tag, or commit.                                |
 | `work-dir`           | compute env's work directory  | Pipeline work directory.                                                  |
 | `parameters`         | —                             | Pipeline parameters, as YAML or JSON.                                     |
