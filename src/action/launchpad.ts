@@ -32,6 +32,10 @@ export function savedToRequest(saved: SavedLaunch): LaunchRequest {
   copy(request, "preRunScript", saved.preRunScript);
   copy(request, "postRunScript", saved.postRunScript);
   copy(request, "nextflowVersion", saved.nextflowVersion);
+  copy(request, "launchContainer", saved.launchContainer);
+  copy(request, "optimizationId", saved.optimizationId);
+  copy(request, "optimizationTargets", saved.optimizationTargets);
+  copy(request, "pipelineSchemaId", saved.pipelineSchemaId);
   copy(request, "syntaxParser", saved.syntaxParser);
   copy(request, "stubRun", saved.stubRun);
   copy(request, "pullLatest", saved.pullLatest);

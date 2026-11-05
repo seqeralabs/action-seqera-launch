@@ -38,6 +38,10 @@ const SavedLaunchSchema = Schema.Struct({
     preRunScript: nullable(Schema.String),
     postRunScript: nullable(Schema.String),
     nextflowVersion: nullable(Schema.String),
+    launchContainer: nullable(Schema.String),
+    optimizationId: nullable(Schema.String),
+    optimizationTargets: nullable(Schema.String),
+    pipelineSchemaId: nullable(Schema.Finite),
     syntaxParser: nullable(Schema.Literals(["v1", "v2"])),
     stubRun: nullable(Schema.Boolean),
     pullLatest: nullable(Schema.Boolean),
@@ -161,8 +165,7 @@ export function findLaunchpadLaunch(
   });
 }
 
-// Creates the named pipeline from the launch request and returns its saved
-// launch. If another job created it first, returns that one instead.
+// The caller must overlay a conflict winner, but not append inputs twice to a new launch.
 export function createLaunchpadPipeline(
   client: SeqeraClient,
   workspaceId: number | undefined,
@@ -187,7 +190,7 @@ export function createLaunchpadPipeline(
           workspaceId,
           created.pipeline.pipelineId,
           created.pipeline.version.id,
-        ),
+        ).pipe(Effect.map((savedLaunch) => ({ launch: savedLaunch, created: true }))),
       ),
       Effect.catchIf(
         (error): error is HttpResponseError =>
@@ -198,7 +201,7 @@ export function createLaunchpadPipeline(
             if (winner === undefined) {
               return yield* error;
             }
-            return winner;
+            return { launch: winner, created: false };
           }),
       ),
     );

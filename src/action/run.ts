@@ -2,7 +2,11 @@ import * as core from "@actions/core";
 import { Effect } from "effect";
 import { createSeqeraClient, type SeqeraClient, type SeqeraHttpTransport } from "../api/client.js";
 import { createWorkflowLaunch, listComputeEnvs } from "../api/endpoints.js";
-import { createLaunchpadPipeline, findLaunchpadLaunch } from "../api/launchpad.js";
+import {
+  createLaunchpadPipeline,
+  findLaunchpadLaunch,
+  type SavedLaunch,
+} from "../api/launchpad.js";
 import type { ListComputeEnvsResponseEntry } from "../api/schemas/compute-env.js";
 import {
   ComputeEnvAmbiguousError,
@@ -19,7 +23,7 @@ import {
   buildJobSummaryOptions,
 } from "../monitoring/report.js";
 import { workspaceRef, workflowWatchUrl } from "../monitoring/workflow-url.js";
-import { readActionInputs } from "./inputs.js";
+import { readActionInputs, type ActionInputs } from "./inputs.js";
 import { overlayLaunch, savedToRequest } from "./launchpad.js";
 import { buildActionOutputOptions, setActionOutputs } from "./outputs.js";
 const USER_AGENT = "seqeralabs/action-seqera-launch";
@@ -135,6 +139,56 @@ function handleWorkflowTerminalFailure(
   });
 }
 
+function prepareLaunch(client: SeqeraClient, inputs: ActionInputs, saved: SavedLaunch | undefined) {
+  return Effect.gen(function* () {
+    const launchRequest =
+      saved === undefined
+        ? { ...inputs.launch }
+        : overlayLaunch(savedToRequest(saved), inputs.launch);
+    const computeEnvInputSet =
+      inputs.computeEnvId !== undefined || inputs.computeEnvName !== undefined;
+    const savedComputeEnvId = launchRequest.computeEnvId;
+    const resolved =
+      !computeEnvInputSet && savedComputeEnvId !== undefined
+        ? {
+            computeEnvId: savedComputeEnvId,
+            label: saved?.computeEnv?.name ?? savedComputeEnvId,
+            workDir: launchRequest.workDir,
+          }
+        : yield* resolveComputeEnv(
+            client,
+            inputs.workspaceId,
+            inputs.computeEnvId,
+            inputs.computeEnvName,
+          );
+    launchRequest.computeEnvId = resolved.computeEnvId;
+
+    if (
+      !computeEnvInputSet &&
+      savedComputeEnvId !== undefined &&
+      launchRequest.workDir === undefined
+    ) {
+      const listed = yield* listComputeEnvs(client, inputs.workspaceId);
+      resolved.workDir = listed.computeEnvs?.find(
+        (entry) => entry.id === savedComputeEnvId,
+      )?.workDir;
+    }
+    // A named compute override must not retain another environment's directory.
+    if (
+      inputs.launch.workDir === undefined &&
+      (computeEnvInputSet || launchRequest.workDir === undefined)
+    ) {
+      if (resolved.workDir !== undefined && resolved.workDir.length > 0) {
+        launchRequest.workDir = resolved.workDir;
+        core.info(`Using compute environment work directory ${resolved.workDir}`);
+      } else if (inputs.computeEnvId === undefined) {
+        return yield* new WorkDirMissingError({ computeEnv: resolved.label });
+      }
+    }
+    return { launchRequest, label: resolved.label };
+  });
+}
+
 // The transport parameter exists so tests can drive the whole run against a mock API.
 export function runAction(http?: SeqeraHttpTransport) {
   return Effect.gen(function* () {
@@ -154,59 +208,32 @@ export function runAction(http?: SeqeraHttpTransport) {
       inputs.launchpadName === undefined
         ? undefined
         : yield* findLaunchpadLaunch(client, inputs.workspaceId, inputs.launchpadName);
-    const launchRequest =
-      saved === undefined
-        ? { ...inputs.launch }
-        : overlayLaunch(savedToRequest(saved), inputs.launch);
+    let prepared = yield* prepareLaunch(client, inputs, saved);
     if (saved !== undefined) {
       core.info(`Using Launchpad pipeline '${inputs.launchpadName}' as the base configuration`);
     }
 
-    const computeEnvInputSet =
-      inputs.computeEnvId !== undefined || inputs.computeEnvName !== undefined;
-    const savedComputeEnvId = launchRequest.computeEnvId;
-    const resolved =
-      !computeEnvInputSet && savedComputeEnvId !== undefined
-        ? {
-            computeEnvId: savedComputeEnvId,
-            label: saved?.computeEnv?.name ?? savedComputeEnvId,
-            workDir: undefined,
-          }
-        : yield* resolveComputeEnv(
-            client,
-            inputs.workspaceId,
-            inputs.computeEnvId,
-            inputs.computeEnvName,
-          );
-    launchRequest.computeEnvId = resolved.computeEnvId;
-
-    // Fall back to the compute environment's own work directory so a correctly
-    // configured environment does not require the work-dir input. A compute
-    // environment chosen by input brings its own work directory over a saved one.
-    if (
-      inputs.launch.workDir === undefined &&
-      (computeEnvInputSet || launchRequest.workDir === undefined)
-    ) {
-      if (resolved.workDir !== undefined && resolved.workDir.length > 0) {
-        launchRequest.workDir = resolved.workDir;
-        core.info(`Using compute environment work directory ${resolved.workDir}`);
-      } else if (launchRequest.workDir === undefined && inputs.computeEnvId === undefined) {
-        return yield* new WorkDirMissingError({ computeEnv: resolved.label });
-      }
-    }
-
     if (inputs.launchpadName !== undefined && saved === undefined) {
-      const created = yield* createLaunchpadPipeline(
+      const result = yield* createLaunchpadPipeline(
         client,
         inputs.workspaceId,
         inputs.launchpadName,
-        launchRequest,
+        prepared.launchRequest,
       );
-      launchRequest.id = created.id;
-      core.info(`Saved Launchpad pipeline '${inputs.launchpadName}'`);
+      if (result.created) {
+        prepared.launchRequest.id = result.launch.id;
+        core.info(`Saved Launchpad pipeline '${inputs.launchpadName}'`);
+      } else {
+        prepared = yield* prepareLaunch(client, inputs, result.launch);
+        core.info(`Using Launchpad pipeline '${inputs.launchpadName}' created by another job`);
+      }
     }
 
-    const launched = yield* createWorkflowLaunch(client, inputs.workspaceId, launchRequest);
+    const launched = yield* createWorkflowLaunch(
+      client,
+      inputs.workspaceId,
+      prepared.launchRequest,
+    );
     const workflowId = launched.workflowId;
     core.info(`Launched workflow ${workflowId}`);
 
@@ -217,7 +244,7 @@ export function runAction(http?: SeqeraHttpTransport) {
       inputs.workspaceId,
       inputs.wait,
       inputs.timeoutMs,
-      resolved.label,
+      prepared.label,
     ).pipe(
       Effect.catchTag("WorkflowTerminalFailureError", (error) =>
         handleWorkflowTerminalFailure(

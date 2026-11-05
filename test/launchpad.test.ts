@@ -3,6 +3,45 @@ import { Effect } from "effect";
 import { overlayLaunch, savedToRequest } from "../src/action/launchpad.js";
 import { runAction } from "../src/action/run.js";
 import { MockHttpClient, MockHttpResponse } from "./helpers/mock-http.js";
+import type { SavedLaunch } from "../src/api/launchpad.js";
+import type { ListComputeEnvsResponseEntry } from "../src/api/schemas/compute-env.js";
+
+function response(body: string, statusCode = 200) {
+  return new MockHttpResponse({ statusCode, headers: {} }, body);
+}
+
+function launchFixture(
+  saved: SavedLaunch,
+  computeEnvs: ListComputeEnvsResponseEntry[],
+  createStatus?: 200 | 409,
+) {
+  const launches: unknown[] = [];
+  const creates: unknown[] = [];
+  let listings = 0;
+  const http = new MockHttpClient()
+    .when(/\/pipelines\?.*search=/u, () => {
+      listings += 1;
+      return response(
+        JSON.stringify({
+          pipelines:
+            createStatus !== undefined && listings === 1 ? [] : [{ name: "demo", pipelineId: 42 }],
+          totalSize: createStatus !== undefined && listings === 1 ? 0 : 1,
+        }),
+      );
+    })
+    .when("/pipelines/42/launch", () => response(JSON.stringify({ launch: saved })))
+    .when("/pipelines", (_url, _method, body) => {
+      creates.push(JSON.parse(body ?? "{}"));
+      return response('{"pipeline":{"pipelineId":42,"version":{"id":"v-new"}}}', createStatus);
+    })
+    .when("/compute-envs", () => response(JSON.stringify({ computeEnvs })))
+    .when("/workflow/launch", (_url, _method, body) => {
+      launches.push(JSON.parse(body ?? "{}"));
+      return response('{"workflowId":"wf-1"}');
+    })
+    .when("/workflow/wf-1", () => response('{"workflow":{"id":"wf-1","status":"SUBMITTED"}}'));
+  return { http, launches, creates };
+}
 
 describe("Launchpad overlay", () => {
   it("maps the saved compute environment and keeps unset inputs from the saved launch", () => {
@@ -13,6 +52,10 @@ describe("Launchpad overlay", () => {
       revision: "v1.0.0",
       configProfiles: ["test"],
       outputDir: null,
+      launchContainer: "custom/launch:1",
+      optimizationId: "optimized",
+      optimizationTargets: "cpu,memory",
+      pipelineSchemaId: 17,
     });
 
     expect(base).toEqual({
@@ -21,6 +64,10 @@ describe("Launchpad overlay", () => {
       workDir: "s3://saved/work",
       revision: "v1.0.0",
       configProfiles: ["test"],
+      launchContainer: "custom/launch:1",
+      optimizationId: "optimized",
+      optimizationTargets: "cpu,memory",
+      pipelineSchemaId: 17,
     });
     expect(overlayLaunch(base, { revision: "abc123" })).toEqual({ ...base, revision: "abc123" });
   });
@@ -49,6 +96,10 @@ describe("runAction with a Launchpad pipeline", () => {
     INPUT_REVISION: "abc123",
     "INPUT_NEXTFLOW-CONFIG": "process.cpus = 2",
     INPUT_WAIT: "none",
+    "INPUT_COMPUTE-ENV": "",
+    "INPUT_COMPUTE-ENV-ID": "",
+    "INPUT_WORK-DIR": "",
+    INPUT_PARAMETERS: "",
   };
   const previous = new Map<string, string | undefined>();
 
@@ -68,6 +119,139 @@ describe("runAction with a Launchpad pipeline", () => {
       }
     }
     previous.clear();
+  });
+
+  it("uses the saved compute environment's default when its launch has no work directory", async () => {
+    const fixture = launchFixture({ id: "saved-launch", computeEnv: { id: "ce-saved" } }, [
+      { id: "ce-saved", name: "saved", workDir: "s3://default/work" },
+    ]);
+    await Effect.runPromise(runAction(fixture.http));
+    expect(fixture.launches).toEqual([
+      {
+        launch: expect.objectContaining({ computeEnvId: "ce-saved", workDir: "s3://default/work" }),
+      },
+    ]);
+  });
+
+  it("fails when the saved environment has no saved or default work directory", async () => {
+    const fixture = launchFixture({ id: "saved-launch", computeEnv: { id: "ce-saved" } }, [
+      { id: "ce-saved", name: "saved" },
+    ]);
+    await expect(Effect.runPromise(runAction(fixture.http))).rejects.toMatchObject({
+      _tag: "WorkDirMissingError",
+    });
+    expect(fixture.launches).toEqual([]);
+  });
+
+  it.each([undefined, "gs://new/work"])(
+    "does not reuse the old directory when named compute changes (default %s)",
+    async (workDir) => {
+      process.env["INPUT_COMPUTE-ENV"] = "new";
+      const computeEnv: ListComputeEnvsResponseEntry =
+        workDir === undefined
+          ? { id: "ce-new", name: "new" }
+          : { id: "ce-new", name: "new", workDir };
+      const fixture = launchFixture(
+        { id: "saved-launch", computeEnv: { id: "ce-saved" }, workDir: "s3://old/work" },
+        [computeEnv],
+      );
+      if (workDir === undefined) {
+        await expect(Effect.runPromise(runAction(fixture.http))).rejects.toMatchObject({
+          _tag: "WorkDirMissingError",
+        });
+        expect(fixture.launches).toEqual([]);
+      } else {
+        await Effect.runPromise(runAction(fixture.http));
+        expect(fixture.launches).toEqual([
+          { launch: expect.objectContaining({ computeEnvId: "ce-new", workDir }) },
+        ]);
+      }
+    },
+  );
+
+  it("keeps an explicit work directory when changing named compute", async () => {
+    process.env["INPUT_COMPUTE-ENV"] = "new";
+    process.env["INPUT_WORK-DIR"] = "gs://explicit/work";
+    const fixture = launchFixture(
+      { id: "saved-launch", computeEnv: { id: "ce-saved" }, workDir: "s3://old/work" },
+      [{ id: "ce-new", name: "new" }],
+    );
+    await Effect.runPromise(runAction(fixture.http));
+    expect(fixture.launches).toEqual([
+      {
+        launch: expect.objectContaining({ computeEnvId: "ce-new", workDir: "gs://explicit/work" }),
+      },
+    ]);
+  });
+
+  it("overlays a concurrent creation winner before launching, including compute defaults", async () => {
+    process.env.INPUT_PARAMETERS = "input: ci.csv";
+    process.env.INPUT_REVISION = "";
+    const fixture = launchFixture(
+      {
+        id: "winner-launch",
+        revision: "saved-revision",
+        computeEnv: { id: "ce-saved" },
+        configText: "plugins { id 'nf-snapshot' }",
+        paramsText: "input: saved.csv\ngenome: hg38",
+        userSecrets: ["user-secret"],
+        workspaceSecrets: ["workspace-secret"],
+        optimizationId: "optimized",
+      },
+      [
+        { id: "ce-primary", name: "primary", primary: true, workDir: "s3://primary/work" },
+        { id: "ce-saved", name: "saved", workDir: "s3://saved/work" },
+      ],
+      409,
+    );
+    await Effect.runPromise(runAction(fixture.http));
+    expect(fixture.creates).toHaveLength(1);
+    expect(fixture.launches).toEqual([
+      {
+        launch: {
+          id: "winner-launch",
+          computeEnvId: "ce-saved",
+          workDir: "s3://saved/work",
+          pipeline: "https://github.com/org/repo",
+          revision: "saved-revision",
+          configText: "plugins { id 'nf-snapshot' }\nprocess.cpus = 2",
+          paramsText: JSON.stringify({ input: "ci.csv", genome: "hg38" }),
+          userSecrets: ["user-secret"],
+          workspaceSecrets: ["workspace-secret"],
+          optimizationId: "optimized",
+        },
+      },
+    ]);
+  });
+
+  it("takes an explicit compute id on trust without requiring a work directory", async () => {
+    process.env["INPUT_COMPUTE-ENV-ID"] = "ce-explicit";
+    const fixture = launchFixture({ id: "saved-launch" }, []);
+    await Effect.runPromise(runAction(fixture.http));
+    expect(fixture.launches).toEqual([
+      {
+        launch: {
+          id: "saved-launch",
+          computeEnvId: "ce-explicit",
+          pipeline: "https://github.com/org/repo",
+          revision: "abc123",
+          configText: "process.cpus = 2",
+        },
+      },
+    ]);
+  });
+
+  it("does not append action configuration twice after a successful creation", async () => {
+    const fixture = launchFixture(
+      { id: "created-launch", configText: "process.cpus = 2" },
+      [{ id: "ce-primary", name: "primary", primary: true, workDir: "s3://primary/work" }],
+      200,
+    );
+    await Effect.runPromise(runAction(fixture.http));
+    expect(fixture.creates).toHaveLength(1);
+    expect(fixture.launches).toEqual([
+      { launch: expect.objectContaining({ id: "created-launch", configText: "process.cpus = 2" }) },
+    ]);
   });
 
   it("launches the saved entry with action inputs overlaid and never writes to it", async () => {
@@ -98,6 +282,10 @@ describe("runAction with a Launchpad pipeline", () => {
               revision: "v1.0.0",
               configText: "plugins { id 'nf-snapshot' }",
               sessionId: "old-session",
+              launchContainer: "custom/launch:1",
+              optimizationId: "optimized",
+              optimizationTargets: "cpu,memory",
+              pipelineSchemaId: 17,
             },
           }),
         );
@@ -125,6 +313,10 @@ describe("runAction with a Launchpad pipeline", () => {
         workDir: "s3://saved/work",
         revision: "abc123",
         configText: "plugins { id 'nf-snapshot' }\nprocess.cpus = 2",
+        launchContainer: "custom/launch:1",
+        optimizationId: "optimized",
+        optimizationTargets: "cpu,memory",
+        pipelineSchemaId: 17,
       },
     });
     expect(calls.some((call) => call.includes("/compute-envs"))).toBe(false);
