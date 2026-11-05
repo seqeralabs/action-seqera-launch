@@ -19,10 +19,14 @@ inputs:
   # compute-env-id wins when both are set. Resolving a name costs a
   # ListComputeEnvs call, which has no name filter, so the match happens here.
   compute-env-id:
-    description: Compute environment ID to launch into
+    description: >-
+      Compute environment ID to launch into; replaces a Launchpad pipeline's
+      saved compute environment
     required: false
   compute-env:
-    description: Compute environment name; ignored when compute-env-id is set
+    description: >-
+      Compute environment name; ignored when compute-env-id is set. Replaces a
+      Launchpad pipeline's saved compute environment
     required: false
 
   pipeline:
@@ -30,13 +34,19 @@ inputs:
     required: false
     default: https://github.com/${{ github.repository }}
   launchpad-name:
-    description: Save or update this named pipeline in the workspace Launchpad before launching
+    description: >-
+      Launch this named Launchpad pipeline with the action inputs overlaid on its
+      saved configuration; created from the inputs if absent
     required: false
   revision:
-    description: Pipeline revision, branch, tag, or commit
+    description: >-
+      Pipeline revision, branch, tag, or commit; with launchpad-name, unset
+      means the saved revision
     required: false
   work-dir:
-    description: Pipeline work directory
+    description: >-
+      Pipeline work directory; defaults to the saved Launchpad work directory,
+      then the compute environment's
     required: false
   parameters:
     description: Pipeline parameters, as YAML or JSON

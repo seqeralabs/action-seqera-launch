@@ -1,5 +1,5 @@
 import * as core from "@actions/core";
-import { Effect, Result, Schema } from "effect";
+import { Effect, Option, Result, Schema } from "effect";
 import { parse as parseYaml } from "yaml";
 import { InputValidationError } from "../errors.js";
 import type { ApiWorkflowLaunchRequest } from "../api/types.js";
@@ -67,6 +67,15 @@ function parseOptionalStringList(value: string | undefined): string[] | undefine
   return items.length === 0 ? undefined : items;
 }
 
+// YAML is a superset of JSON, so this reads either form. Undefined when neither parses.
+export function parseYamlOrJson(text: string): Schema.Json | undefined {
+  try {
+    return Option.getOrUndefined(Schema.decodeUnknownOption(Schema.Json)(parseYaml(text)));
+  } catch {
+    return undefined;
+  }
+}
+
 function parseParametersText(value: string | undefined): string | undefined {
   if (value === undefined || value.trim().length === 0) {
     return undefined;
@@ -75,12 +84,8 @@ function parseParametersText(value: string | undefined): string | undefined {
     JSON.parse(value);
     return value;
   } catch {
-    try {
-      const parsed = parseYaml(value);
-      return JSON.stringify(parsed);
-    } catch {
-      return undefined;
-    }
+    const parsed = parseYamlOrJson(value);
+    return parsed === undefined ? undefined : JSON.stringify(parsed);
   }
 }
 

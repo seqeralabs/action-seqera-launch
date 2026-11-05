@@ -1,8 +1,8 @@
-import { Effect, Schema } from "effect";
+import { Effect, Option, Schema, SchemaGetter } from "effect";
 import { ApiDecodeError, HttpResponseError } from "../errors.js";
 import type { SeqeraClient } from "./client.js";
 import { workspaceQuery } from "./endpoints.js";
-import type { ApiWorkflowLaunchRequest } from "./types.js";
+import type { ApiWorkflowLaunchRequest, ApiWorkflowLaunchResponse } from "./types.js";
 
 const PAGE_SIZE = 100;
 
@@ -13,7 +13,65 @@ const SavedPipelineSchema = Schema.Struct({
   }),
 });
 
-const SavedLaunchSchema = Schema.Struct({ launch: Schema.Struct({ id: Schema.String }) });
+// The API sends null for unset launch fields, though the spec types them as
+// plain optionals. Decoding drops the null so the field is simply absent.
+function optionalNullable<S extends Schema.Top>(schema: S) {
+  return Schema.optionalKey(Schema.NullOr(schema)).pipe(
+    Schema.decodeTo(Schema.optionalKey(schema), {
+      decode: SchemaGetter.transformOptional((value) =>
+        Option.filter(value, (field) => field !== null),
+      ),
+      encode: SchemaGetter.passthrough(),
+    }),
+  );
+}
+
+// Only the fields the action carries into a launch. Run-specific fields such
+// as commitId, sessionId and resume are left out on purpose: copying them from
+// a saved template would pin or resume every run.
+const SavedLaunchSchema = Schema.Struct({
+  launch: Schema.Struct({
+    id: Schema.String,
+    computeEnv: optionalNullable(
+      Schema.Struct({
+        id: Schema.optionalKey(Schema.String),
+        name: Schema.optionalKey(Schema.String),
+      }),
+    ),
+    pipeline: optionalNullable(Schema.String),
+    workDir: optionalNullable(Schema.String),
+    revision: optionalNullable(Schema.String),
+    configText: optionalNullable(Schema.String),
+    paramsText: optionalNullable(Schema.String),
+    configProfiles: optionalNullable(Schema.mutable(Schema.Array(Schema.String))),
+    preRunScript: optionalNullable(Schema.String),
+    postRunScript: optionalNullable(Schema.String),
+    nextflowVersion: optionalNullable(Schema.String),
+    optimizationId: optionalNullable(Schema.String),
+    optimizationTargets: optionalNullable(Schema.String),
+    pipelineSchemaId: optionalNullable(Schema.Finite),
+    syntaxParser: optionalNullable(Schema.Literals(["v1", "v2"])),
+    stubRun: optionalNullable(Schema.Boolean),
+    pullLatest: optionalNullable(Schema.Boolean),
+    headJobCpus: optionalNullable(Schema.Finite),
+    headJobMemoryMb: optionalNullable(Schema.Finite),
+    outputDir: optionalNullable(Schema.String),
+    mainScript: optionalNullable(Schema.String),
+    entryName: optionalNullable(Schema.String),
+    schemaName: optionalNullable(Schema.String),
+    towerConfig: optionalNullable(Schema.String),
+    userSecrets: optionalNullable(Schema.mutable(Schema.Array(Schema.String))),
+    workspaceSecrets: optionalNullable(Schema.mutable(Schema.Array(Schema.String))),
+  }),
+});
+
+export type SavedLaunch = Schema.Schema.Type<typeof SavedLaunchSchema>["launch"];
+
+// Fails the build if a field is renamed or dropped upstream (ADR 0004).
+type _AssertTrue<T extends true> = T;
+type _AssertSavedLaunchFields = _AssertTrue<
+  [Exclude<keyof SavedLaunch, keyof ApiWorkflowLaunchResponse>] extends [never] ? true : false
+>;
 
 const ListPipelinesSchema = Schema.Struct({
   pipelines: Schema.optionalKey(
@@ -21,9 +79,6 @@ const ListPipelinesSchema = Schema.Struct({
       Schema.Struct({
         name: Schema.optionalKey(Schema.String),
         pipelineId: Schema.optionalKey(Schema.Finite),
-        labels: Schema.optionalKey(
-          Schema.NullOr(Schema.Array(Schema.Struct({ id: Schema.Finite }))),
-        ),
       }),
     ),
   ),
@@ -32,7 +87,6 @@ const ListPipelinesSchema = Schema.Struct({
 
 type ListedPipelines = Schema.Schema.Type<typeof ListPipelinesSchema>;
 type ListedPipeline = NonNullable<ListedPipelines["pipelines"]>[number];
-type SavedPipeline = Schema.Schema.Type<typeof SavedPipelineSchema>;
 
 function listPipelinePage(
   client: SeqeraClient,
@@ -46,7 +100,6 @@ function listPipelinePage(
       path: "/pipelines",
       query: {
         ...workspaceQuery(workspaceId),
-        attributes: "labels",
         search: name,
         max: PAGE_SIZE,
         offset,
@@ -83,50 +136,57 @@ function findLaunchpadPipeline(
   });
 }
 
-function describeSavedLaunchId(
+function describeSavedLaunch(
   client: SeqeraClient,
   workspaceId: number | undefined,
-  saved: SavedPipeline,
+  pipelineId: number,
+  versionId: string | undefined,
 ) {
   return client
     .requestJson(
       {
         method: "GET",
-        path: `/pipelines/${saved.pipeline.pipelineId}/launch`,
-        query: { ...workspaceQuery(workspaceId), versionId: saved.pipeline.version.id },
+        path: `/pipelines/${pipelineId}/launch`,
+        query:
+          versionId === undefined
+            ? workspaceQuery(workspaceId)
+            : { ...workspaceQuery(workspaceId), versionId },
       },
       SavedLaunchSchema,
     )
-    .pipe(Effect.map((response) => response.launch.id));
+    .pipe(Effect.map((response) => response.launch));
 }
 
-function updatePipeline(
+// Reads the named pipeline's default version, or undefined when absent. The
+// action never writes to an existing pipeline (ADR 0008).
+export function findLaunchpadLaunch(
   client: SeqeraClient,
   workspaceId: number | undefined,
-  existing: ListedPipeline,
-  launch: ApiWorkflowLaunchRequest,
+  name: string,
 ) {
   return Effect.gen(function* () {
-    if (existing.pipelineId === undefined || existing.labels === undefined) {
+    const existing = yield* findLaunchpadPipeline(client, workspaceId, name);
+    if (existing === undefined) {
+      return undefined;
+    }
+    if (existing.pipelineId === undefined) {
       return yield* new ApiDecodeError({
         endpoint: "GET /pipelines",
-        detail: `Pipeline '${existing.name ?? ""}' is missing its ID or labels`,
+        detail: `Pipeline '${name}' is missing its ID`,
       });
     }
-    return yield* client.requestJson(
-      {
-        method: "PUT",
-        path: `/pipelines/${existing.pipelineId}`,
-        query: workspaceQuery(workspaceId),
-        body: { launch, labelIds: (existing.labels ?? []).map((label) => label.id) },
-        retryTransient: false,
-      },
-      SavedPipelineSchema,
-    );
+    return yield* describeSavedLaunch(client, workspaceId, existing.pipelineId, undefined);
   });
 }
 
-function createPipeline(
+// Creates the named pipeline from a prepared launch. "Created" means the
+// request is already saved, so only its id is needed. "Existing" means another
+// job won a 409 race; its launch is a base the caller must overlay.
+export type LaunchpadCreateResult =
+  | { readonly _tag: "Created"; readonly launchId: string }
+  | { readonly _tag: "Existing"; readonly launch: SavedLaunch };
+
+export function createLaunchpadPipeline(
   client: SeqeraClient,
   workspaceId: number | undefined,
   name: string,
@@ -144,34 +204,31 @@ function createPipeline(
       SavedPipelineSchema,
     )
     .pipe(
+      Effect.flatMap((created) =>
+        describeSavedLaunch(
+          client,
+          workspaceId,
+          created.pipeline.pipelineId,
+          created.pipeline.version.id,
+        ).pipe(
+          Effect.map((savedLaunch): LaunchpadCreateResult => ({
+            _tag: "Created",
+            launchId: savedLaunch.id,
+          })),
+        ),
+      ),
       Effect.catchIf(
         (error): error is HttpResponseError =>
           error._tag === "HttpResponseError" && error.statusCode === 409,
         (error) =>
           Effect.gen(function* () {
-            // Another job created the pipeline between our lookup and our POST: update the winner.
-            const winner = yield* findLaunchpadPipeline(client, workspaceId, name);
+            const winner = yield* findLaunchpadLaunch(client, workspaceId, name);
             if (winner === undefined) {
               return yield* error;
             }
-            return yield* updatePipeline(client, workspaceId, winner, launch);
+            const existing: LaunchpadCreateResult = { _tag: "Existing", launch: winner };
+            return existing;
           }),
       ),
     );
-}
-
-export function saveLaunchpadPipeline(
-  client: SeqeraClient,
-  workspaceId: number | undefined,
-  name: string,
-  launch: ApiWorkflowLaunchRequest,
-) {
-  return Effect.gen(function* () {
-    const existing = yield* findLaunchpadPipeline(client, workspaceId, name);
-    const saved =
-      existing === undefined
-        ? yield* createPipeline(client, workspaceId, name, launch)
-        : yield* updatePipeline(client, workspaceId, existing, launch);
-    return yield* describeSavedLaunchId(client, workspaceId, saved);
-  });
 }

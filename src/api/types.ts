@@ -1,6 +1,7 @@
 import type { components } from "./schema.js";
 
 export type ApiWorkflowLaunchRequest = components["schemas"]["WorkflowLaunchRequest"];
+export type ApiWorkflowLaunchResponse = components["schemas"]["WorkflowLaunchResponse"];
 export type ApiSubmitWorkflowLaunchResponse = components["schemas"]["SubmitWorkflowLaunchResponse"];
 export type ApiDescribeWorkflowResponse = components["schemas"]["DescribeWorkflowResponse"];
 export type ApiWorkflowStatus = components["schemas"]["WorkflowStatus"];
