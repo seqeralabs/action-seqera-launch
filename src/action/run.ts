@@ -7,6 +7,7 @@ import {
   findLaunchpadLaunch,
   type SavedLaunch,
 } from "../api/launchpad.js";
+import type { ApiWorkflowLaunchRequest } from "../api/types.js";
 import type { ListComputeEnvsResponseEntry } from "../api/schemas/compute-env.js";
 import {
   ComputeEnvAmbiguousError,
@@ -24,7 +25,7 @@ import {
 } from "../monitoring/report.js";
 import { workspaceRef, workflowWatchUrl } from "../monitoring/workflow-url.js";
 import { readActionInputs, type ActionInputs } from "./inputs.js";
-import { overlayLaunch, savedToRequest } from "./launchpad.js";
+import { overlayLaunch, savedToRequest } from "./overlay.js";
 import { buildActionOutputOptions, setActionOutputs } from "./outputs.js";
 const USER_AGENT = "seqeralabs/action-seqera-launch";
 
@@ -139,49 +140,70 @@ function handleWorkflowTerminalFailure(
   });
 }
 
+// Uses the saved compute environment as-is, listing environments only when the
+// saved launch has no work directory of its own.
+function savedComputeEnv(
+  client: SeqeraClient,
+  workspaceId: number | undefined,
+  computeEnvId: string,
+  name: string | undefined,
+  workDir: string | undefined,
+) {
+  return Effect.gen(function* () {
+    const label = name ?? computeEnvId;
+    if (workDir !== undefined) {
+      return { computeEnvId, label, workDir };
+    }
+    const listed = yield* listComputeEnvs(client, workspaceId);
+    const entry = listed.computeEnvs?.find((candidate) => candidate.id === computeEnvId);
+    return { computeEnvId, label, workDir: entry?.workDir };
+  });
+}
+
 function prepareLaunch(client: SeqeraClient, inputs: ActionInputs, saved: SavedLaunch | undefined) {
   return Effect.gen(function* () {
-    const launchRequest =
-      saved === undefined
-        ? { ...inputs.launch }
-        : overlayLaunch(savedToRequest(saved), inputs.launch);
-    const computeEnvInputSet =
-      inputs.computeEnvId !== undefined || inputs.computeEnvName !== undefined;
+    let launchRequest: ApiWorkflowLaunchRequest;
+    if (saved === undefined) {
+      launchRequest = { ...inputs.launch };
+    } else {
+      const overlay = overlayLaunch(savedToRequest(saved), inputs.launch);
+      for (const warning of overlay.warnings) {
+        core.warning(warning);
+      }
+      launchRequest = overlay.launch;
+    }
     const savedComputeEnvId = launchRequest.computeEnvId;
-    const resolved =
-      !computeEnvInputSet && savedComputeEnvId !== undefined
-        ? {
-            computeEnvId: savedComputeEnvId,
-            label: saved?.computeEnv?.name ?? savedComputeEnvId,
-            workDir: launchRequest.workDir,
-          }
-        : yield* resolveComputeEnv(
-            client,
-            inputs.workspaceId,
-            inputs.computeEnvId,
-            inputs.computeEnvName,
-          );
+    const useSavedComputeEnv =
+      inputs.computeEnvId === undefined &&
+      inputs.computeEnvName === undefined &&
+      savedComputeEnvId !== undefined;
+    const resolved = useSavedComputeEnv
+      ? yield* savedComputeEnv(
+          client,
+          inputs.workspaceId,
+          savedComputeEnvId,
+          saved?.computeEnv?.name,
+          launchRequest.workDir,
+        )
+      : yield* resolveComputeEnv(
+          client,
+          inputs.workspaceId,
+          inputs.computeEnvId,
+          inputs.computeEnvName,
+        );
     launchRequest.computeEnvId = resolved.computeEnvId;
 
-    if (
-      !computeEnvInputSet &&
-      savedComputeEnvId !== undefined &&
-      launchRequest.workDir === undefined
-    ) {
-      const listed = yield* listComputeEnvs(client, inputs.workspaceId);
-      resolved.workDir = listed.computeEnvs?.find(
-        (entry) => entry.id === savedComputeEnvId,
-      )?.workDir;
-    }
-    // A named compute override must not retain another environment's directory.
-    if (
-      inputs.launch.workDir === undefined &&
-      (computeEnvInputSet || launchRequest.workDir === undefined)
-    ) {
+    // A saved work directory belongs to the saved compute environment, so any
+    // compute override must not carry it over.
+    const keepSavedWorkDir = useSavedComputeEnv && launchRequest.workDir !== undefined;
+    if (inputs.launch.workDir === undefined && !keepSavedWorkDir) {
       if (resolved.workDir !== undefined && resolved.workDir.length > 0) {
         launchRequest.workDir = resolved.workDir;
         core.info(`Using compute environment work directory ${resolved.workDir}`);
-      } else if (inputs.computeEnvId === undefined) {
+      } else if (inputs.computeEnvId !== undefined) {
+        // An explicit id is taken on trust; Platform falls back to its default.
+        delete launchRequest.workDir;
+      } else {
         return yield* new WorkDirMissingError({ computeEnv: resolved.label });
       }
     }
@@ -220,8 +242,8 @@ export function runAction(http?: SeqeraHttpTransport) {
         inputs.launchpadName,
         prepared.launchRequest,
       );
-      if (result.created) {
-        prepared.launchRequest.id = result.launch.id;
+      if (result._tag === "Created") {
+        prepared.launchRequest.id = result.launchId;
         core.info(`Saved Launchpad pipeline '${inputs.launchpadName}'`);
       } else {
         prepared = yield* prepareLaunch(client, inputs, result.launch);

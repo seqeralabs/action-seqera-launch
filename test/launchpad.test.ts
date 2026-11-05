@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Effect } from "effect";
-import { overlayLaunch, savedToRequest } from "../src/action/launchpad.js";
+import { overlayLaunch, savedToRequest } from "../src/action/overlay.js";
 import { runAction } from "../src/action/run.js";
 import { MockHttpClient, MockHttpResponse } from "./helpers/mock-http.js";
 import type { SavedLaunch } from "../src/api/launchpad.js";
@@ -51,8 +51,6 @@ describe("Launchpad overlay", () => {
       workDir: "s3://saved/work",
       revision: "v1.0.0",
       configProfiles: ["test"],
-      outputDir: null,
-      launchContainer: "custom/launch:1",
       optimizationId: "optimized",
       optimizationTargets: "cpu,memory",
       pipelineSchemaId: 17,
@@ -64,16 +62,18 @@ describe("Launchpad overlay", () => {
       workDir: "s3://saved/work",
       revision: "v1.0.0",
       configProfiles: ["test"],
-      launchContainer: "custom/launch:1",
       optimizationId: "optimized",
       optimizationTargets: "cpu,memory",
       pipelineSchemaId: 17,
     });
-    expect(overlayLaunch(base, { revision: "abc123" })).toEqual({ ...base, revision: "abc123" });
+    expect(overlayLaunch(base, { revision: "abc123" }).launch).toEqual({
+      ...base,
+      revision: "abc123",
+    });
   });
 
   it("appends config and merges parameters, with action values winning", () => {
-    const merged = overlayLaunch(
+    const { launch: merged, warnings } = overlayLaunch(
       {
         configText: "plugins { id 'nf-snapshot' }",
         paramsText: "input: saved.csv\ngenome: hg38\n",
@@ -83,6 +83,17 @@ describe("Launchpad overlay", () => {
 
     expect(merged.configText).toBe("plugins { id 'nf-snapshot' }\nprocess.cpus = 2");
     expect(JSON.parse(merged.paramsText ?? "")).toEqual({ input: "ci.csv", genome: "hg38" });
+    expect(warnings).toEqual([]);
+  });
+
+  it("warns and uses the action's parameters when saved parameters are not a map", () => {
+    const { launch, warnings } = overlayLaunch(
+      { paramsText: "- not\n- a map" },
+      { paramsText: '{"input":"ci.csv"}' },
+    );
+
+    expect(launch.paramsText).toBe('{"input":"ci.csv"}');
+    expect(warnings).toHaveLength(1);
   });
 });
 
@@ -241,6 +252,21 @@ describe("runAction with a Launchpad pipeline", () => {
     ]);
   });
 
+  it("drops the saved work directory when an explicit compute id replaces the saved one", async () => {
+    process.env["INPUT_COMPUTE-ENV-ID"] = "ce-explicit";
+    const fixture = launchFixture(
+      { id: "saved-launch", computeEnv: { id: "ce-saved" }, workDir: "s3://old/work" },
+      [],
+    );
+    await Effect.runPromise(runAction(fixture.http));
+    expect(fixture.launches).toEqual([
+      { launch: expect.not.objectContaining({ workDir: expect.anything() }) },
+    ]);
+    expect(fixture.launches).toEqual([
+      { launch: expect.objectContaining({ computeEnvId: "ce-explicit" }) },
+    ]);
+  });
+
   it("does not append action configuration twice after a successful creation", async () => {
     const fixture = launchFixture(
       { id: "created-launch", configText: "process.cpus = 2" },
@@ -282,6 +308,7 @@ describe("runAction with a Launchpad pipeline", () => {
               revision: "v1.0.0",
               configText: "plugins { id 'nf-snapshot' }",
               sessionId: "old-session",
+              outputDir: null,
               launchContainer: "custom/launch:1",
               optimizationId: "optimized",
               optimizationTargets: "cpu,memory",
@@ -313,7 +340,6 @@ describe("runAction with a Launchpad pipeline", () => {
         workDir: "s3://saved/work",
         revision: "abc123",
         configText: "plugins { id 'nf-snapshot' }\nprocess.cpus = 2",
-        launchContainer: "custom/launch:1",
         optimizationId: "optimized",
         optimizationTargets: "cpu,memory",
         pipelineSchemaId: 17,

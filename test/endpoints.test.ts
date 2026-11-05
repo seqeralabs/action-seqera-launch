@@ -102,7 +102,7 @@ describe("API endpoints", () => {
       createLaunchpadPipeline(client, 123, "demo", { pipeline: "https://example.com/repo" }),
     );
 
-    expect(saved).toEqual({ launch: { id: "saved-launch" }, created: true });
+    expect(saved).toEqual({ _tag: "Created", launchId: "saved-launch" });
     expect(requests.map((request) => request.method)).toEqual(["POST", "GET"]);
     expect(requests[0]?.body).toEqual({
       name: "demo",
@@ -168,7 +168,7 @@ describe("API endpoints", () => {
       createLaunchpadPipeline(client, 123, "demo", { pipeline: "repo" }),
     );
 
-    expect(saved).toEqual({ launch: { id: "winner-launch" }, created: false });
+    expect(saved).toEqual({ _tag: "Existing", launch: { id: "winner-launch" } });
     expect(listings).toBe(1);
     expect(methods).toEqual(["POST", "GET", "GET"]);
   });

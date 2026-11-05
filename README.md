@@ -32,7 +32,7 @@ To launch through a workspace Launchpad pipeline, set `launchpad-name`:
 If the named pipeline exists, its saved launch is the base configuration and the action's inputs overlay it for this run only. The action never writes to an existing pipeline, so settings you keep in the Launchpad (a plugin config, a compute environment, secrets) survive every run. Overlay rules:
 
 - `nextflow-config` is appended after the saved config, so its settings win.
-- `parameters` are merged key by key into the saved parameters; the action's keys win.
+- `parameters` are merged into the saved parameters by top-level key; the action's keys win. The merged result is sent as JSON.
 - Any other input replaces the saved value when set, and leaves it alone when not. `compute-env` and `compute-env-id` replace the saved compute environment; `compute-env` also brings its work directory.
 
 Unset `revision` means the saved revision, so set `revision: ${{ github.sha }}` to test each commit. `pipeline` defaults to the current repository and always overrides the saved one; the action warns when they differ.
@@ -92,9 +92,9 @@ A job summary is always written, pass or fail.
 
 Give `compute-env` (a name) or `compute-env-id`. When both are set, **the id wins** — the Platform API's compute-environment listing has no name filter, so an id is the unambiguous choice.
 
-Supplying neither uses the workspace's **primary** compute environment. If the workspace has none, the action says so rather than surfacing the API's empty `403`.
+Supplying neither uses the Launchpad pipeline's saved compute environment when `launchpad-name` is set, otherwise the workspace's **primary** one. If the workspace has no primary, the action says so rather than surfacing the API's empty `403`.
 
-`work-dir` is optional. Left unset, the action uses the resolved compute environment's own work directory. An explicit `compute-env-id` is taken on trust and skips that lookup, so pair it with `work-dir` if the environment has no default.
+`work-dir` is optional. Left unset, the action uses the Launchpad pipeline's saved work directory, or else the resolved compute environment's own. A `compute-env` or `compute-env-id` input drops the saved work directory, since it belongs to the saved environment. An explicit `compute-env-id` is taken on trust and skips that lookup, so pair it with `work-dir` if the environment has no default.
 
 ## Inputs
 
@@ -110,7 +110,7 @@ Only `access-token` is required.
 | `pipeline`           | current repository            | Pipeline to launch.                                                       |
 | `launchpad-name`     | —                             | Launch this Launchpad pipeline with inputs overlaid; create it if absent. |
 | `revision`           | —                             | Pipeline revision, branch, tag, or commit.                                |
-| `work-dir`           | compute env's work directory  | Pipeline work directory.                                                  |
+| `work-dir`           | saved, else compute env's     | Pipeline work directory.                                                  |
 | `parameters`         | —                             | Pipeline parameters, as YAML or JSON.                                     |
 | `profiles`           | —                             | Nextflow config profiles, one per line or comma-separated.                |
 | `run-name`           | —                             | Name for the run.                                                         |

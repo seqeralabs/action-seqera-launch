@@ -1,8 +1,8 @@
-import { Effect, Schema } from "effect";
+import { Effect, Option, Schema, SchemaGetter } from "effect";
 import { ApiDecodeError, HttpResponseError } from "../errors.js";
 import type { SeqeraClient } from "./client.js";
 import { workspaceQuery } from "./endpoints.js";
-import type { ApiWorkflowLaunchRequest } from "./types.js";
+import type { ApiWorkflowLaunchRequest, ApiWorkflowLaunchResponse } from "./types.js";
 
 const PAGE_SIZE = 100;
 
@@ -13,8 +13,17 @@ const SavedPipelineSchema = Schema.Struct({
   }),
 });
 
-function nullable<S extends Schema.Top>(schema: S) {
-  return Schema.optionalKey(Schema.NullOr(schema));
+// The API sends null for unset launch fields, though the spec types them as
+// plain optionals. Decoding drops the null so the field is simply absent.
+function optionalNullable<S extends Schema.Top>(schema: S) {
+  return Schema.optionalKey(Schema.NullOr(schema)).pipe(
+    Schema.decodeTo(Schema.optionalKey(schema), {
+      decode: SchemaGetter.transformOptional((value) =>
+        Option.filter(value, (field) => field !== null),
+      ),
+      encode: SchemaGetter.passthrough(),
+    }),
+  );
 }
 
 // Only the fields the action carries into a launch. Run-specific fields such
@@ -23,41 +32,46 @@ function nullable<S extends Schema.Top>(schema: S) {
 const SavedLaunchSchema = Schema.Struct({
   launch: Schema.Struct({
     id: Schema.String,
-    computeEnv: nullable(
+    computeEnv: optionalNullable(
       Schema.Struct({
         id: Schema.optionalKey(Schema.String),
         name: Schema.optionalKey(Schema.String),
       }),
     ),
-    pipeline: nullable(Schema.String),
-    workDir: nullable(Schema.String),
-    revision: nullable(Schema.String),
-    configText: nullable(Schema.String),
-    paramsText: nullable(Schema.String),
-    configProfiles: nullable(Schema.Array(Schema.String)),
-    preRunScript: nullable(Schema.String),
-    postRunScript: nullable(Schema.String),
-    nextflowVersion: nullable(Schema.String),
-    launchContainer: nullable(Schema.String),
-    optimizationId: nullable(Schema.String),
-    optimizationTargets: nullable(Schema.String),
-    pipelineSchemaId: nullable(Schema.Finite),
-    syntaxParser: nullable(Schema.Literals(["v1", "v2"])),
-    stubRun: nullable(Schema.Boolean),
-    pullLatest: nullable(Schema.Boolean),
-    headJobCpus: nullable(Schema.Finite),
-    headJobMemoryMb: nullable(Schema.Finite),
-    outputDir: nullable(Schema.String),
-    mainScript: nullable(Schema.String),
-    entryName: nullable(Schema.String),
-    schemaName: nullable(Schema.String),
-    towerConfig: nullable(Schema.String),
-    userSecrets: nullable(Schema.Array(Schema.String)),
-    workspaceSecrets: nullable(Schema.Array(Schema.String)),
+    pipeline: optionalNullable(Schema.String),
+    workDir: optionalNullable(Schema.String),
+    revision: optionalNullable(Schema.String),
+    configText: optionalNullable(Schema.String),
+    paramsText: optionalNullable(Schema.String),
+    configProfiles: optionalNullable(Schema.mutable(Schema.Array(Schema.String))),
+    preRunScript: optionalNullable(Schema.String),
+    postRunScript: optionalNullable(Schema.String),
+    nextflowVersion: optionalNullable(Schema.String),
+    optimizationId: optionalNullable(Schema.String),
+    optimizationTargets: optionalNullable(Schema.String),
+    pipelineSchemaId: optionalNullable(Schema.Finite),
+    syntaxParser: optionalNullable(Schema.Literals(["v1", "v2"])),
+    stubRun: optionalNullable(Schema.Boolean),
+    pullLatest: optionalNullable(Schema.Boolean),
+    headJobCpus: optionalNullable(Schema.Finite),
+    headJobMemoryMb: optionalNullable(Schema.Finite),
+    outputDir: optionalNullable(Schema.String),
+    mainScript: optionalNullable(Schema.String),
+    entryName: optionalNullable(Schema.String),
+    schemaName: optionalNullable(Schema.String),
+    towerConfig: optionalNullable(Schema.String),
+    userSecrets: optionalNullable(Schema.mutable(Schema.Array(Schema.String))),
+    workspaceSecrets: optionalNullable(Schema.mutable(Schema.Array(Schema.String))),
   }),
 });
 
 export type SavedLaunch = Schema.Schema.Type<typeof SavedLaunchSchema>["launch"];
+
+// Fails the build if a field is renamed or dropped upstream (ADR 0004).
+type _AssertTrue<T extends true> = T;
+type _AssertSavedLaunchFields = _AssertTrue<
+  [Exclude<keyof SavedLaunch, keyof ApiWorkflowLaunchResponse>] extends [never] ? true : false
+>;
 
 const ListPipelinesSchema = Schema.Struct({
   pipelines: Schema.optionalKey(
@@ -165,7 +179,13 @@ export function findLaunchpadLaunch(
   });
 }
 
-// The caller must overlay a conflict winner, but not append inputs twice to a new launch.
+// Creates the named pipeline from a prepared launch. "Created" means the
+// request is already saved, so only its id is needed. "Existing" means another
+// job won a 409 race; its launch is a base the caller must overlay.
+export type LaunchpadCreateResult =
+  | { readonly _tag: "Created"; readonly launchId: string }
+  | { readonly _tag: "Existing"; readonly launch: SavedLaunch };
+
 export function createLaunchpadPipeline(
   client: SeqeraClient,
   workspaceId: number | undefined,
@@ -190,7 +210,12 @@ export function createLaunchpadPipeline(
           workspaceId,
           created.pipeline.pipelineId,
           created.pipeline.version.id,
-        ).pipe(Effect.map((savedLaunch) => ({ launch: savedLaunch, created: true }))),
+        ).pipe(
+          Effect.map((savedLaunch): LaunchpadCreateResult => ({
+            _tag: "Created",
+            launchId: savedLaunch.id,
+          })),
+        ),
       ),
       Effect.catchIf(
         (error): error is HttpResponseError =>
@@ -201,7 +226,8 @@ export function createLaunchpadPipeline(
             if (winner === undefined) {
               return yield* error;
             }
-            return { launch: winner, created: false };
+            const existing: LaunchpadCreateResult = { _tag: "Existing", launch: winner };
+            return existing;
           }),
       ),
     );
