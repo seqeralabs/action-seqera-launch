@@ -1,6 +1,7 @@
-import { Effect, Option, Schema, SchemaGetter } from "effect";
+import { Effect, Schema } from "effect";
 import { ApiDecodeError, HttpResponseError } from "../errors.js";
 import type { SeqeraClient } from "./client.js";
+import { optionalNullable } from "./schemas/common.js";
 import { workspaceQuery } from "./endpoints.js";
 import type { ApiWorkflowLaunchRequest, ApiWorkflowLaunchResponse } from "./types.js";
 
@@ -13,19 +14,6 @@ const SavedPipelineSchema = Schema.Struct({
   }),
 });
 
-// The API sends null for unset launch fields, though the spec types them as
-// plain optionals. Decoding drops the null so the field is simply absent.
-function optionalNullable<S extends Schema.Top>(schema: S) {
-  return Schema.optionalKey(Schema.NullOr(schema)).pipe(
-    Schema.decodeTo(Schema.optionalKey(schema), {
-      decode: SchemaGetter.transformOptional((value) =>
-        Option.filter(value, (field) => field !== null),
-      ),
-      encode: SchemaGetter.passthrough(),
-    }),
-  );
-}
-
 // Only the fields the action carries into a launch. Run-specific fields such
 // as commitId, sessionId and resume are left out on purpose: copying them from
 // a saved template would pin or resume every run.
@@ -34,8 +22,8 @@ const SavedLaunchSchema = Schema.Struct({
     id: Schema.String,
     computeEnv: optionalNullable(
       Schema.Struct({
-        id: Schema.optionalKey(Schema.String),
-        name: Schema.optionalKey(Schema.String),
+        id: optionalNullable(Schema.String),
+        name: optionalNullable(Schema.String),
       }),
     ),
     pipeline: optionalNullable(Schema.String),
@@ -74,15 +62,15 @@ type _AssertSavedLaunchFields = _AssertTrue<
 >;
 
 const ListPipelinesSchema = Schema.Struct({
-  pipelines: Schema.optionalKey(
+  pipelines: optionalNullable(
     Schema.Array(
       Schema.Struct({
-        name: Schema.optionalKey(Schema.String),
-        pipelineId: Schema.optionalKey(Schema.Finite),
+        name: optionalNullable(Schema.String),
+        pipelineId: optionalNullable(Schema.Finite),
       }),
     ),
   ),
-  totalSize: Schema.optionalKey(Schema.Finite),
+  totalSize: optionalNullable(Schema.Finite),
 });
 
 type ListedPipelines = Schema.Schema.Type<typeof ListPipelinesSchema>;

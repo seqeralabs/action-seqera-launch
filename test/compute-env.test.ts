@@ -54,6 +54,18 @@ describe("resolveComputeEnv", () => {
     ).rejects.toMatchObject({ _tag: "ComputeEnvNoPrimaryError" });
   });
 
+  // The spec types these as plain optionals, but Platform sends null for unset fields elsewhere.
+  it("treats null fields as absent", async () => {
+    const client = listing([
+      { id: "ce-1", name: "target", status: "AVAILABLE", workDir: null, primary: null },
+    ]);
+
+    const resolved = await Effect.runPromise(resolveComputeEnv(client, 1, undefined, "target"));
+
+    expect(resolved.computeEnvId).toBe("ce-1");
+    expect(resolved.workDir).toBeUndefined();
+  });
+
   it("rejects an environment that is not available", async () => {
     const client = listing([{ id: "ce-1", name: "broken", status: "INVALID" }]);
 

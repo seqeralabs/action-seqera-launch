@@ -1,25 +1,26 @@
 import { Schema } from "effect";
+import { optionalNullable } from "./common.js";
 import type { ApiListTasksResponse, ApiWorkflowLogResponse } from "../types.js";
 
 export const TaskSchema = Schema.Struct({
-  taskId: Schema.optionalKey(Schema.Number),
-  name: Schema.optionalKey(Schema.String),
-  process: Schema.optionalKey(Schema.String),
-  status: Schema.optionalKey(Schema.String),
-  errorMessage: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  taskId: optionalNullable(Schema.Number),
+  name: optionalNullable(Schema.String),
+  process: optionalNullable(Schema.String),
+  status: optionalNullable(Schema.String),
+  errorMessage: optionalNullable(Schema.String),
 });
 
 export type Task = Schema.Schema.Type<typeof TaskSchema>;
 
 export const DescribeTaskResponseSchema = Schema.Struct({
-  task: Schema.optionalKey(TaskSchema),
+  task: optionalNullable(TaskSchema),
 });
 
 export type DescribeTaskResponse = Schema.Schema.Type<typeof DescribeTaskResponseSchema>;
 
 export const ListTasksResponseSchema = Schema.Struct({
-  tasks: Schema.optionalKey(Schema.Array(DescribeTaskResponseSchema)),
-  total: Schema.optionalKey(Schema.Number),
+  tasks: optionalNullable(Schema.Array(DescribeTaskResponseSchema)),
+  total: optionalNullable(Schema.Number),
 });
 
 export type ListTasksResponse = Schema.Schema.Type<typeof ListTasksResponseSchema>;
@@ -27,19 +28,19 @@ export type ListTasksResponse = Schema.Schema.Type<typeof ListTasksResponseSchem
 type _AssertListTasksResponse = ListTasksResponse extends ApiListTasksResponse ? true : never;
 
 export const LogEntrySchema = Schema.Struct({
-  stderr: Schema.optionalKey(Schema.String),
-  stdout: Schema.optionalKey(Schema.String),
-  name: Schema.optionalKey(Schema.String),
+  stderr: optionalNullable(Schema.String),
+  stdout: optionalNullable(Schema.String),
+  name: optionalNullable(Schema.String),
 });
 
 export type LogEntry = Schema.Schema.Type<typeof LogEntrySchema>;
 
 export const WorkflowLogResponseSchema = Schema.Struct({
-  log: Schema.optionalKey(
+  log: optionalNullable(
     Schema.Struct({
-      entries: Schema.optionalKey(Schema.Json),
-      message: Schema.optionalKey(Schema.String),
-      truncated: Schema.optionalKey(Schema.Boolean),
+      entries: optionalNullable(Schema.Json),
+      message: optionalNullable(Schema.String),
+      truncated: optionalNullable(Schema.Boolean),
     }),
   ),
 });
