@@ -1,9 +1,22 @@
-import { Schema } from "effect";
+import { Option, Schema, SchemaGetter } from "effect";
 import type {
   ApiErrorResponse,
   ApiLaunchValidationError,
   ApiWorkflowLaunchValidationErrorResponse,
 } from "../types.js";
+
+// The API sends null for unset fields, though the spec types them as plain
+// optionals. Decoding drops the null so the field is simply absent.
+export function optionalNullable<S extends Schema.Top>(schema: S) {
+  return Schema.optionalKey(Schema.NullOr(schema)).pipe(
+    Schema.decodeTo(Schema.optionalKey(schema), {
+      decode: SchemaGetter.transformOptional((value) =>
+        Option.filter(value, (field) => field !== null),
+      ),
+      encode: SchemaGetter.passthrough(),
+    }),
+  );
+}
 
 export const ErrorResponseSchema = Schema.Struct({
   message: Schema.String,

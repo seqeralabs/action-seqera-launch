@@ -72,6 +72,19 @@ export class UnknownWorkflowStatusError extends Data.TaggedError("UnknownWorkflo
   readonly workflowUrl: string;
 }> {}
 
+export class StudioFailedError extends Data.TaggedError("StudioFailedError")<{
+  readonly sessionId: string;
+  readonly status: string;
+  readonly message?: string;
+  readonly buildUrl?: string;
+}> {}
+
+export class StudioTimeoutError extends Data.TaggedError("StudioTimeoutError")<{
+  readonly sessionId: string;
+  readonly status: string;
+  readonly timeoutMs: number;
+}> {}
+
 export type ActionError =
   | InputValidationError
   | ApiDecodeError
@@ -85,7 +98,9 @@ export type ActionError =
   | HttpResponseError
   | WorkflowTerminalFailureError
   | WorkflowStuckSubmittedError
-  | UnknownWorkflowStatusError;
+  | UnknownWorkflowStatusError
+  | StudioFailedError
+  | StudioTimeoutError;
 
 type WorkflowTerminalFailurePayload = {
   status: string;
@@ -155,6 +170,16 @@ export function formatActionError(error: ActionError): string {
       return `Workflow remained SUBMITTED for ${String(Math.round(error.timeoutMs / 60_000))} minutes in compute environment '${error.computeEnv}'. See ${error.workflowUrl}`;
     case "UnknownWorkflowStatusError":
       return `Workflow returned unrecognised status '${error.status}'. See ${error.workflowUrl}`;
+    case "StudioFailedError":
+      return [
+        `Studio ${error.sessionId} ${error.status}`,
+        error.message,
+        error.buildUrl === undefined ? undefined : `Build log: ${error.buildUrl}`,
+      ]
+        .filter(Boolean)
+        .join("\n");
+    case "StudioTimeoutError":
+      return `Studio ${error.sessionId} was still ${error.status} after ${String(Math.round(error.timeoutMs / 1000))} seconds`;
     case "HttpTransientError":
       return `Transient HTTP error from ${error.endpoint} (HTTP ${String(error.statusCode)})`;
     default: {

@@ -1,7 +1,8 @@
-import { Effect, Option, Schema, SchemaGetter } from "effect";
+import { Effect, Schema } from "effect";
 import { ApiDecodeError, HttpResponseError } from "../errors.js";
 import type { SeqeraClient } from "./client.js";
 import { workspaceQuery } from "./endpoints.js";
+import { optionalNullable } from "./schemas/common.js";
 import type { ApiWorkflowLaunchRequest, ApiWorkflowLaunchResponse } from "./types.js";
 
 const PAGE_SIZE = 100;
@@ -12,19 +13,6 @@ const SavedPipelineSchema = Schema.Struct({
     version: Schema.Struct({ id: Schema.String }),
   }),
 });
-
-// The API sends null for unset launch fields, though the spec types them as
-// plain optionals. Decoding drops the null so the field is simply absent.
-function optionalNullable<S extends Schema.Top>(schema: S) {
-  return Schema.optionalKey(Schema.NullOr(schema)).pipe(
-    Schema.decodeTo(Schema.optionalKey(schema), {
-      decode: SchemaGetter.transformOptional((value) =>
-        Option.filter(value, (field) => field !== null),
-      ),
-      encode: SchemaGetter.passthrough(),
-    }),
-  );
-}
 
 // Only the fields the action carries into a launch. Run-specific fields such
 // as commitId, sessionId and resume are left out on purpose: copying them from

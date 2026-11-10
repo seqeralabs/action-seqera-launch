@@ -8,6 +8,9 @@ export type ApiWorkflowStatus = components["schemas"]["WorkflowStatus"];
 export type ApiListComputeEnvsResponse = components["schemas"]["ListComputeEnvsResponse"];
 export type ApiListTasksResponse = components["schemas"]["ListTasksResponse"];
 export type ApiWorkflowLogResponse = components["schemas"]["WorkflowLogResponse"];
+export type ApiDataStudioCreateRequest = components["schemas"]["DataStudioCreateRequest"];
+export type ApiDataStudioDto = components["schemas"]["DataStudioDto"];
+export type ApiDataStudioStatus = components["schemas"]["DataStudioStatus"];
 export type ApiErrorResponse = components["schemas"]["ErrorResponse"];
 export type ApiWorkflowLaunchValidationErrorResponse =
   components["schemas"]["WorkflowLaunchValidationErrorResponse"];
