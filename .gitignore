@@ -3,3 +3,4 @@ build/
 coverage/
 *.tsbuildinfo
 .DS_Store
+.amp/in/
