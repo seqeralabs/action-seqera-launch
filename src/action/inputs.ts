@@ -20,6 +20,11 @@ export interface ActionInputs {
 const WaitModeSchema = Schema.Literals(["none", "running", "completion"]);
 const SyntaxParserSchema = Schema.Literals(["v1", "v2"]);
 
+export function optionalString(name: string): string | undefined {
+  const value = core.getInput(name).trim();
+  return value.length > 0 ? value : undefined;
+}
+
 export function optionalBooleanInput(name: string): boolean | undefined {
   const raw = core.getInput(name);
   if (raw.trim().length === 0) {
@@ -239,10 +244,8 @@ export function readTargetInputs() {
 
     const workspaceId = yield* optionalIntegerInput("workspace-id");
 
-    const computeEnvIdRaw = core.getInput("compute-env-id").trim();
-    const computeEnvNameRaw = core.getInput("compute-env").trim();
-    const computeEnvId = computeEnvIdRaw.length > 0 ? computeEnvIdRaw : undefined;
-    const computeEnvName = computeEnvNameRaw.length > 0 ? computeEnvNameRaw : undefined;
+    const computeEnvId = optionalString("compute-env-id");
+    const computeEnvName = optionalString("compute-env");
     return { accessToken, apiEndpoint, workspaceId, computeEnvId, computeEnvName };
   });
 }
@@ -268,8 +271,7 @@ export function readActionInputs(): Effect.Effect<ActionInputs, InputValidationE
   return Effect.gen(function* () {
     const { accessToken, apiEndpoint, workspaceId, computeEnvId, computeEnvName } =
       yield* readTargetInputs();
-    const launchpadNameRaw = core.getInput("launchpad-name").trim();
-    const launchpadName = launchpadNameRaw.length > 0 ? launchpadNameRaw : undefined;
+    const launchpadName = optionalString("launchpad-name");
 
     const waitRaw = core.getInput("wait") || "running";
     const waitResult = Schema.decodeUnknownResult(WaitModeSchema)(waitRaw);

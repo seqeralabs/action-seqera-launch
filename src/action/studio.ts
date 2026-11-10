@@ -6,14 +6,16 @@ import type { Studio } from "../api/schemas/studio.js";
 import type { ApiDataStudioCreateRequest, ApiDataStudioStatus } from "../api/types.js";
 import { InputValidationError, StudioFailedError, StudioTimeoutError } from "../errors.js";
 import { defaultWaitBeforeNextPoll } from "../monitoring/poll.js";
+import { writeSummary } from "../monitoring/report.js";
+import { resolveComputeEnv } from "./compute-env.js";
 import {
   optionalBooleanInput,
   optionalIntegerInput,
   optionalIntegerListInput,
+  optionalString,
   readTargetInputs,
   readTimeoutInput,
 } from "./inputs.js";
-import { resolveComputeEnv } from "./run.js";
 
 const USER_AGENT = "seqeralabs/action-seqera-launch/studio";
 
@@ -28,12 +30,8 @@ export interface StudioInputs {
   readonly autoStart: boolean;
   readonly wait: "none" | "running";
   readonly timeoutMs: number | undefined;
+  readonly commitId: string | undefined;
   readonly request: Omit<ApiDataStudioCreateRequest, "computeEnvId">;
-}
-
-function optionalString(name: string): string | undefined {
-  const value = core.getInput(name).trim();
-  return value.length > 0 ? value : undefined;
 }
 
 function invalid(input: string, message: string) {
@@ -60,14 +58,13 @@ function studioName(commitId: string | undefined) {
   });
 }
 
-function buildStudioRequest() {
+function buildStudioRequest(commitId: string | undefined) {
   return Effect.gen(function* () {
     const repository = optionalString("repository");
     if (repository === undefined) {
       return yield* invalid("repository", "is required");
     }
     const revision = optionalString("revision");
-    const commitId = optionalString("commit-id");
     const remoteConfig: NonNullable<ApiDataStudioCreateRequest["remoteConfig"]> = { repository };
     // Platform ignores commitId and clones whatever `revision` resolves to, so
     // the commit goes in `revision` to pin the Studio to it.
@@ -140,12 +137,14 @@ export function readStudioInputs(): Effect.Effect<StudioInputs, InputValidationE
     if (Result.isFailure(waitResult)) {
       return yield* invalid("wait", `must be one of none, running; got '${waitRaw}'`);
     }
+    const commitId = optionalString("commit-id");
     return {
       ...target,
       autoStart: optionalBooleanInput("auto-start") ?? true,
       wait: waitResult.success,
       timeoutMs: yield* readTimeoutInput(),
-      request: yield* buildStudioRequest(),
+      commitId,
+      request: yield* buildStudioRequest(commitId),
     };
   });
 }
@@ -161,10 +160,6 @@ const STUDIO_PHASES = {
   stopped: "failed",
   stopping: "failed",
 } as const satisfies Record<ApiDataStudioStatus, StudioPhase>;
-
-function studioStatus(studio: Studio): ApiDataStudioStatus | undefined {
-  return studio.statusInfo?.status;
-}
 
 type StudioFailurePayload = {
   sessionId: string;
@@ -201,7 +196,7 @@ function waitForRunning(
     let attempt = 0;
     while (true) {
       // A fresh studio may not report a status yet; it is still starting.
-      const status = studioStatus(studio) ?? "starting";
+      const status = studio.statusInfo?.status ?? "starting";
       const phase = STUDIO_PHASES[status];
       if (phase === "done") {
         return { studio } satisfies WaitOutcome;
@@ -225,8 +220,8 @@ function waitForRunning(
   });
 }
 
-function publishStudio(studio: Studio, inputs: StudioInputs, commitId: string | undefined) {
-  const status = studioStatus(studio) ?? "";
+function publishStudio(studio: Studio, inputs: StudioInputs) {
+  const status = studio.statusInfo?.status ?? "";
   const url = studio.studioUrl ?? "";
   core.setOutput("studio-id", studio.sessionId);
   core.setOutput("studio-url", url);
@@ -238,26 +233,22 @@ function publishStudio(studio: Studio, inputs: StudioInputs, commitId: string | 
 
   const summary = core.summary;
   summary.addHeading("Seqera Platform Studio", 2);
+  const rows = [
+    ["Name", studio.name ?? inputs.request.name],
+    ["Status", status],
+    ["URL", url],
+    ["Commit", inputs.commitId ?? ""],
+    ["Build log", studio.waveBuildUrl ?? ""],
+  ];
+  // core.summary renders an empty cell as broken HTML, so empty rows are left out.
   summary.addTable([
     [
       { data: "Field", header: true },
       { data: "Value", header: true },
     ],
-    ["Name", studio.name ?? inputs.request.name],
-    ["Status", status],
-    ["URL", url],
-    ["Commit", commitId ?? ""],
-    ["Build log", studio.waveBuildUrl ?? ""],
+    ...rows.filter(([, value]) => value !== ""),
   ]);
-  // A summary that cannot be written must not fail the step it reports on.
-  return Effect.promise(() => summary.write()).pipe(
-    Effect.catchDefect((defect) =>
-      Effect.sync(() => {
-        core.warning(`Could not write the job summary: ${String(defect)}`);
-      }),
-    ),
-    Effect.asVoid,
-  );
+  return writeSummary();
 }
 
 // The transport and sleep parameters exist so tests can drive the whole run
@@ -273,7 +264,7 @@ export function runStudioAction(
       http,
     );
     const name = inputs.request.name;
-    const commitId = inputs.request.remoteConfig?.commitId ?? undefined;
+    const commitId = inputs.commitId;
 
     let studio = yield* findStudioByName(client, inputs.workspaceId, name);
     if (studio === undefined) {
@@ -297,7 +288,7 @@ export function runStudioAction(
       core.info(`Reusing existing studio '${name}' (${studio.sessionId})`);
     }
     // A rerun after the lifespan expired finds the studio stopped.
-    if (inputs.autoStart && studioStatus(studio) === "stopped") {
+    if (inputs.autoStart && studio.statusInfo?.status === "stopped") {
       const started = yield* startStudio(client, studio.sessionId, inputs.workspaceId);
       core.info(`Started stopped studio '${name}' (${studio.sessionId})`);
       studio = { ...studio, statusInfo: started.statusInfo ?? { status: "starting" } };
@@ -313,7 +304,7 @@ export function runStudioAction(
     const outcome: WaitOutcome = shouldWait
       ? yield* waitForRunning(client, studio, inputs, waitBeforeNextPoll)
       : { studio };
-    yield* publishStudio(outcome.studio, inputs, commitId);
+    yield* publishStudio(outcome.studio, inputs);
     if (outcome.error !== undefined) {
       return yield* outcome.error;
     }

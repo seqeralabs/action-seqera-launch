@@ -2,7 +2,7 @@ import { Schema } from "effect";
 import type { ApiDataStudioDto, ApiDataStudioStatus } from "../types.js";
 import { optionalNullable } from "./common.js";
 
-export const STUDIO_STATUSES = [
+const STUDIO_STATUSES = [
   "starting",
   "running",
   "stopping",
@@ -22,7 +22,6 @@ export const StudioSchema = Schema.Struct({
     Schema.Struct({
       status: optionalNullable(Schema.Literals(STUDIO_STATUSES)),
       message: optionalNullable(Schema.String),
-      stopReason: optionalNullable(Schema.String),
     }),
   ),
   remoteConfig: optionalNullable(

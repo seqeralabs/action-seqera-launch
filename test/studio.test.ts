@@ -170,7 +170,7 @@ describe("runStudioAction", () => {
 
     expect(calls.map((call) => `${call.method} ${new URL(call.url).pathname}`)).toEqual([
       "GET /studios",
-      "POST /studios/sess-1/start",
+      "PUT /studios/sess-1/start",
       "GET /studios/sess-1",
     ]);
     expect(readOutputs(outputPath)["status"]).toBe("running");

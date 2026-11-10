@@ -1,8 +1,7 @@
-import { Effect, Option, Schema } from "effect";
-import { HttpResponseError, LaunchValidationError } from "../errors.js";
+import { Effect } from "effect";
+import type { HttpResponseError } from "../errors.js";
 import type { SeqeraClient } from "./client.js";
 import { workspaceQuery } from "./endpoints.js";
-import { ErrorResponseSchema } from "./schemas/common.js";
 import {
   CreateStudioResponseSchema,
   ListStudiosResponseSchema,
@@ -49,7 +48,7 @@ export function startStudio(
 ) {
   return client.requestJson(
     {
-      method: "POST",
+      method: "PUT",
       path: `/studios/${sessionId}/start`,
       query: workspaceQuery(workspaceId),
       body: {},
@@ -95,15 +94,6 @@ export function createStudio(
             const existing: StudioCreateResult = { _tag: "Existing", studio: winner };
             return existing;
           }),
-      ),
-      Effect.catchIf(
-        (error): error is HttpResponseError =>
-          error._tag === "HttpResponseError" && error.statusCode === 400,
-        (error) => {
-          const body = Schema.decodeUnknownOption(ErrorResponseSchema)(error.body);
-          const message = Option.isSome(body) ? body.value.message : error.message;
-          return Effect.fail(new LaunchValidationError({ message: `Studio rejected: ${message}` }));
-        },
       ),
     );
 }

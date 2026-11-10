@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Effect } from "effect";
 import { createSeqeraClient } from "../src/api/client.js";
-import { resolveComputeEnv } from "../src/action/run.js";
+import { resolveComputeEnv } from "../src/action/compute-env.js";
 import { MockHttpClient, MockHttpResponse } from "./helpers/mock-http.js";
 
 function testClient(http: MockHttpClient) {
