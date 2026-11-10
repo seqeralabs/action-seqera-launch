@@ -22,8 +22,8 @@ const SavedLaunchSchema = Schema.Struct({
     id: Schema.String,
     computeEnv: optionalNullable(
       Schema.Struct({
-        id: Schema.optionalKey(Schema.String),
-        name: Schema.optionalKey(Schema.String),
+        id: optionalNullable(Schema.String),
+        name: optionalNullable(Schema.String),
       }),
     ),
     pipeline: optionalNullable(Schema.String),
@@ -62,15 +62,15 @@ type _AssertSavedLaunchFields = _AssertTrue<
 >;
 
 const ListPipelinesSchema = Schema.Struct({
-  pipelines: Schema.optionalKey(
+  pipelines: optionalNullable(
     Schema.Array(
       Schema.Struct({
-        name: Schema.optionalKey(Schema.String),
-        pipelineId: Schema.optionalKey(Schema.Finite),
+        name: optionalNullable(Schema.String),
+        pipelineId: optionalNullable(Schema.Finite),
       }),
     ),
   ),
-  totalSize: Schema.optionalKey(Schema.Finite),
+  totalSize: optionalNullable(Schema.Finite),
 });
 
 type ListedPipelines = Schema.Schema.Type<typeof ListPipelinesSchema>;

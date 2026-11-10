@@ -5,8 +5,9 @@ import type {
   ApiWorkflowLaunchValidationErrorResponse,
 } from "../types.js";
 
-// The API sends null for unset fields, though the spec types them as plain
-// optionals. Decoding drops the null so the field is simply absent.
+// The one way to declare an optional response field. Platform sends null for
+// unset fields that the spec types as plain optionals (seen on workflow describe
+// and saved launches), so decoding drops the null and the field is simply absent.
 export function optionalNullable<S extends Schema.Top>(schema: S) {
   return Schema.optionalKey(Schema.NullOr(schema)).pipe(
     Schema.decodeTo(Schema.optionalKey(schema), {
@@ -31,8 +32,8 @@ type _AssertErrorResponse = ErrorResponse extends ApiErrorResponse
   : never;
 
 export const LaunchValidationErrorSchema = Schema.Struct({
-  code: Schema.optionalKey(Schema.String),
-  message: Schema.optionalKey(Schema.String),
+  code: optionalNullable(Schema.String),
+  message: optionalNullable(Schema.String),
 });
 
 export type LaunchValidationErrorRecord = Schema.Schema.Type<typeof LaunchValidationErrorSchema>;
@@ -43,7 +44,7 @@ type _AssertLaunchValidationError = LaunchValidationErrorRecord extends ApiLaunc
 
 export const WorkflowLaunchValidationErrorResponseSchema = Schema.Struct({
   message: Schema.String,
-  errors: Schema.optionalKey(Schema.Array(LaunchValidationErrorSchema)),
+  errors: optionalNullable(Schema.Array(LaunchValidationErrorSchema)),
 });
 
 export type WorkflowLaunchValidationErrorResponse = Schema.Schema.Type<

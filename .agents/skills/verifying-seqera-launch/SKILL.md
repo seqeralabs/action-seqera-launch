@@ -16,7 +16,7 @@ npm ci
 npm run build
 ```
 
-Before writing evidence, add `/.amp/in/` to the file named by `git rev-parse --git-path info/exclude` if absent. Preserve existing rules. A successful build produces `dist/index.js`. Review `git diff -- dist/` rather than discarding bundle changes.
+A successful build produces `dist/index.js`. Review `git diff -- dist/` rather than discarding bundle changes.
 
 ## Doctor
 

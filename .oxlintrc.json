@@ -2,7 +2,11 @@
   "$schema": "./node_modules/@effect/tsgo/oxlint-schema.json",
   "extends": ["./node_modules/@effect/tsgo/oxlint-presets/recommended.json"],
   "plugins": ["typescript", "unicorn", "oxc"],
-  "jsPlugins": ["./tools/oxlint/anti-slop/index.ts", "./tools/oxlint/anti-slop/effect/index.ts"],
+  "jsPlugins": [
+    "./tools/oxlint/anti-slop/index.ts",
+    "./tools/oxlint/anti-slop/effect/index.ts",
+    "./tools/oxlint/seqera/index.ts"
+  ],
   "categories": {
     "correctness": "error",
     "suspicious": "error",
@@ -30,6 +34,14 @@
     "anti-slop-effect/no-service-constructor-imports": "error",
     "eslint/no-underscore-dangle": ["error", { "allow": ["_tag", "_exhaustive"] }]
   },
+  "overrides": [
+    {
+      "files": ["src/api/**/*.ts"],
+      "rules": {
+        "seqera/optional-response-field": "error"
+      }
+    }
+  ],
   "ignorePatterns": [
     "dist/**",
     "node_modules/**",
