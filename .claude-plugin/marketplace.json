@@ -1,0 +1,12 @@
+{
+  "name": "action-seqera-launch",
+  "description": "Claude Code plugins for working on this repo",
+  "owner": { "name": "Seqera" },
+  "plugins": [
+    {
+      "name": "effect-lsp",
+      "source": "./plugins/effect-lsp",
+      "description": "Effect Language Service (@effect/tsgo) for Effect-aware TypeScript diagnostics"
+    }
+  ]
+}

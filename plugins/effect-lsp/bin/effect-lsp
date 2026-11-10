@@ -1,0 +1,9 @@
+#!/bin/sh
+# Start the Effect Language Service: the Effect-patched tsc matching the installed TypeScript 7.
+set -e
+cd "${CLAUDE_PROJECT_DIR:-.}"
+exe=$(node_modules/.bin/effect-tsgo get-exe-path 2>/dev/null) || {
+  echo "effect-lsp: run npm ci first (needs @effect/tsgo and @typescript/native)" >&2
+  exit 1
+}
+exec "$exe" --lsp --stdio

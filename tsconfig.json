@@ -14,7 +14,9 @@
     "exactOptionalPropertyTypes": true,
     "verbatimModuleSyntax": true,
     "isolatedModules": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+
+    "plugins": [{ "name": "@effect/language-service" }]
   },
   "include": ["src/**/*.ts", "test/**/*.ts", "rolldown.config.ts"]
 }
