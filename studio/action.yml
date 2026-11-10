@@ -1,0 +1,106 @@
+name: Seqera Platform Studio
+description: Create a Seqera Platform Studio from this repository at the CI commit
+author: Seqera
+
+# Inputs follow the root action's kebab-case contract (ADR 0005). ADR 0009
+# records why this is a sub-action rather than a mode of the root action.
+inputs:
+  access-token:
+    description: Seqera Platform access token; needs the Maintain role or above
+    required: true
+  api-endpoint:
+    description: Seqera Platform API endpoint
+    required: false
+    default: https://api.cloud.seqera.io
+  workspace-id:
+    description: Seqera Platform workspace ID; defaults to the user workspace
+    required: false
+  compute-env-id:
+    description: Compute environment ID to run the studio in
+    required: false
+  compute-env:
+    description: >-
+      Compute environment name; ignored when compute-env-id is set. Defaults to
+      the workspace primary
+    required: false
+
+  name:
+    description: >-
+      Studio name, 1 to 100 characters; defaults to <repository name>-<short
+      commit>. An existing studio with this name is reused, not recreated
+    required: false
+  description:
+    description: Studio description
+    required: false
+  repository:
+    description: Git repository to clone; must contain .seqera/studio-config.yaml
+    required: false
+    default: https://github.com/${{ github.repository }}
+  revision:
+    description: Branch or tag to clone
+    required: false
+    default: ${{ github.head_ref || github.ref_name }}
+  commit-id:
+    description: Commit to check out
+    required: false
+    default: ${{ github.event.pull_request.head.sha || github.sha }}
+  tool-url:
+    description: >-
+      Container image for the studio tool; omit to build from the repository's
+      studio config
+    required: false
+  cpu:
+    description: CPUs for the studio
+    required: false
+  memory-mb:
+    description: Memory for the studio, in MB
+    required: false
+  gpu:
+    description: GPUs for the studio
+    required: false
+  lifespan-hours:
+    description: Hours the studio runs before it stops
+    required: false
+  conda-environment:
+    description: Conda environment definition to add to the studio
+    required: false
+  private:
+    description: Make the studio visible only to its creator
+    required: false
+  spot:
+    description: Run the studio on spot instances
+    required: false
+  label-ids:
+    description: Label IDs to attach, one per line or comma-separated
+    required: false
+  auto-start:
+    description: Start the studio once it is created
+    required: false
+    default: "true"
+  wait:
+    description: >-
+      running waits until the studio is running and fails if its build or start
+      fails; none returns once it is created
+    required: false
+    default: running
+  timeout:
+    description: Max time to wait, e.g. 30m. Unset waits until the job's own time limit.
+    required: false
+
+outputs:
+  studio-id:
+    description: The studio session ID
+  studio-url:
+    description: URL to connect to the studio
+  status:
+    description: Studio status when the step finished
+  workspace-id:
+    description: The workspace the studio was created in
+
+runs:
+  using: node24
+  main: ../dist/studio.js
+
+branding:
+  icon: play
+  color: green

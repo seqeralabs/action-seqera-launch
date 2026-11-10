@@ -1,7 +1,7 @@
 name: check-dist
 
-# dist/index.js is committed because the Actions runtime executes it directly.
-# This job fails when it is stale relative to src/.
+# dist/index.js and dist/studio.js are committed because the Actions runtime
+# executes them directly. This job fails when either is stale relative to src/.
 
 on:
   push:
