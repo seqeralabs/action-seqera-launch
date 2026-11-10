@@ -1,8 +1,8 @@
 import { Effect, Schema } from "effect";
 import { ApiDecodeError, HttpResponseError } from "../errors.js";
 import type { SeqeraClient } from "./client.js";
-import { optionalNullable } from "./schemas/common.js";
 import { workspaceQuery } from "./endpoints.js";
+import { optionalNullable } from "./schemas/common.js";
 import type { ApiWorkflowLaunchRequest, ApiWorkflowLaunchResponse } from "./types.js";
 
 const PAGE_SIZE = 100;

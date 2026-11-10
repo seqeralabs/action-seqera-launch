@@ -154,9 +154,13 @@ export function writeJobSummary(options: JobSummaryOptions) {
   } else {
     summary.addRaw("\nLaunch step failed.\n");
   }
-  // A summary that cannot be written must not fail the launch it is
-  // reporting on, so failures are logged and swallowed.
-  return Effect.promise(() => summary.write()).pipe(
+  return writeSummary();
+}
+
+// A summary that cannot be written must not fail the step it is reporting
+// on, so failures are logged and swallowed.
+export function writeSummary() {
+  return Effect.promise(() => core.summary.write()).pipe(
     Effect.catchDefect((defect) =>
       Effect.sync(() => {
         core.warning(`Could not write the job summary: ${String(defect)}`);

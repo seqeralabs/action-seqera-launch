@@ -20,7 +20,12 @@ export interface ActionInputs {
 const WaitModeSchema = Schema.Literals(["none", "running", "completion"]);
 const SyntaxParserSchema = Schema.Literals(["v1", "v2"]);
 
-function optionalBooleanInput(name: string): boolean | undefined {
+export function optionalString(name: string): string | undefined {
+  const value = core.getInput(name).trim();
+  return value.length > 0 ? value : undefined;
+}
+
+export function optionalBooleanInput(name: string): boolean | undefined {
   const raw = core.getInput(name);
   if (raw.trim().length === 0) {
     return undefined;
@@ -41,7 +46,7 @@ function parseInteger(value: string, input: string): Effect.Effect<number, Input
   return Effect.succeed(parsed);
 }
 
-function optionalIntegerInput(
+export function optionalIntegerInput(
   name: string,
 ): Effect.Effect<number | undefined, InputValidationError> {
   return Effect.gen(function* () {
@@ -65,6 +70,16 @@ function parseOptionalStringList(value: string | undefined): string[] | undefine
   }
   const items = splitList(value);
   return items.length === 0 ? undefined : items;
+}
+
+export function optionalIntegerListInput(
+  name: string,
+): Effect.Effect<number[] | undefined, InputValidationError> {
+  const raw = core.getInput(name);
+  if (raw.trim().length === 0) {
+    return Effect.succeed(undefined);
+  }
+  return Effect.forEach(splitList(raw), (value) => parseInteger(value, name));
 }
 
 // YAML is a superset of JSON, so this reads either form. Undefined when neither parses.
@@ -211,7 +226,8 @@ function buildLaunchRequest(): ApiWorkflowLaunchRequest {
   return launch;
 }
 
-export function readActionInputs(): Effect.Effect<ActionInputs, InputValidationError> {
+// Inputs shared by the launch and studio actions: who to call and where to run.
+export function readTargetInputs() {
   return Effect.gen(function* () {
     const accessToken = core.getInput("access-token", { required: true }).trim();
     if (accessToken.length === 0) {
@@ -228,12 +244,34 @@ export function readActionInputs(): Effect.Effect<ActionInputs, InputValidationE
 
     const workspaceId = yield* optionalIntegerInput("workspace-id");
 
-    const computeEnvIdRaw = core.getInput("compute-env-id").trim();
-    const computeEnvNameRaw = core.getInput("compute-env").trim();
-    const computeEnvId = computeEnvIdRaw.length > 0 ? computeEnvIdRaw : undefined;
-    const computeEnvName = computeEnvNameRaw.length > 0 ? computeEnvNameRaw : undefined;
-    const launchpadNameRaw = core.getInput("launchpad-name").trim();
-    const launchpadName = launchpadNameRaw.length > 0 ? launchpadNameRaw : undefined;
+    const computeEnvId = optionalString("compute-env-id");
+    const computeEnvName = optionalString("compute-env");
+    return { accessToken, apiEndpoint, workspaceId, computeEnvId, computeEnvName };
+  });
+}
+
+export function readTimeoutInput(): Effect.Effect<number | undefined, InputValidationError> {
+  const timeoutRaw = core.getInput("timeout").trim();
+  if (timeoutRaw.length === 0) {
+    return Effect.succeed(undefined);
+  }
+  const parsed = parseDurationMs(timeoutRaw);
+  if (parsed === undefined) {
+    return Effect.fail(
+      new InputValidationError({
+        input: "timeout",
+        message: `must be a duration like 90m, got '${timeoutRaw}'`,
+      }),
+    );
+  }
+  return Effect.succeed(parsed);
+}
+
+export function readActionInputs(): Effect.Effect<ActionInputs, InputValidationError> {
+  return Effect.gen(function* () {
+    const { accessToken, apiEndpoint, workspaceId, computeEnvId, computeEnvName } =
+      yield* readTargetInputs();
+    const launchpadName = optionalString("launchpad-name");
 
     const waitRaw = core.getInput("wait") || "running";
     const waitResult = Schema.decodeUnknownResult(WaitModeSchema)(waitRaw);
@@ -247,20 +285,7 @@ export function readActionInputs(): Effect.Effect<ActionInputs, InputValidationE
     }
     const wait = waitResult.success;
 
-    const timeoutRaw = core.getInput("timeout").trim();
-    let timeoutMs: number | undefined;
-    if (timeoutRaw.length > 0) {
-      const parsed = parseDurationMs(timeoutRaw);
-      if (parsed === undefined) {
-        return yield* Effect.fail(
-          new InputValidationError({
-            input: "timeout",
-            message: `must be a duration like 90m, got '${timeoutRaw}'`,
-          }),
-        );
-      }
-      timeoutMs = parsed;
-    }
+    const timeoutMs = yield* readTimeoutInput();
 
     const parametersRaw = core.getInput("parameters");
     if (parametersRaw.trim().length > 0 && parseParametersText(parametersRaw) === undefined) {
@@ -273,11 +298,9 @@ export function readActionInputs(): Effect.Effect<ActionInputs, InputValidationE
     }
 
     const launch = buildLaunchRequest();
-    const labelIdsRaw = core.getInput("label-ids");
-    if (labelIdsRaw.trim().length > 0) {
-      launch.labelIds = yield* Effect.forEach(splitList(labelIdsRaw), (value) =>
-        parseInteger(value, "label-ids"),
-      );
+    const labelIds = yield* optionalIntegerListInput("label-ids");
+    if (labelIds !== undefined) {
+      launch.labelIds = labelIds;
     }
     const headJobCpus = yield* optionalIntegerInput("head-job-cpus");
     if (headJobCpus !== undefined) {
