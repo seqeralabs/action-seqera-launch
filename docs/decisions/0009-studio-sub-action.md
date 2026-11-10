@@ -14,4 +14,4 @@ Creation is find-or-create, as for Launchpad pipelines (ADR 0008). The action li
 
 Each commit leaves a Studio behind. Cleanup is the workspace's job (lifespan limits, or deleting old Studios); the action never stops or deletes one.
 
-A reused Studio that has stopped, for example after its lifespan expired, fails the wait rather than being restarted. Set a new `name` or delete the old Studio to get a fresh one.
+A reused Studio that has stopped, for example after its lifespan expired, is started again when `auto-start` is true, so rerunning a CI job brings the Studio back. An `errored` or `buildFailed` Studio is not retried; set a new `name` or delete it to get a fresh one.

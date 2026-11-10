@@ -1,7 +1,7 @@
 import * as core from "@actions/core";
 import { Effect, Result, Schema } from "effect";
 import { createSeqeraClient, type SeqeraClient, type SeqeraHttpTransport } from "../api/client.js";
-import { createStudio, describeStudio, findStudioByName } from "../api/studios.js";
+import { createStudio, describeStudio, findStudioByName, startStudio } from "../api/studios.js";
 import type { Studio } from "../api/schemas/studio.js";
 import type { ApiDataStudioCreateRequest, ApiDataStudioStatus } from "../api/types.js";
 import { InputValidationError, StudioFailedError, StudioTimeoutError } from "../errors.js";
@@ -100,8 +100,10 @@ function buildStudioRequest() {
     const request: Omit<ApiDataStudioCreateRequest, "computeEnvId"> = {
       name: yield* studioName(commitId),
       remoteConfig,
-      configuration,
     };
+    if (Object.keys(configuration).length > 0) {
+      request.configuration = configuration;
+    }
 
     const description = optionalString("description");
     if (description !== undefined) {
@@ -290,6 +292,12 @@ export function runStudioAction(
       );
     } else {
       core.info(`Reusing existing studio '${name}' (${studio.sessionId})`);
+    }
+    // A rerun after the lifespan expired finds the studio stopped.
+    if (inputs.autoStart && studioStatus(studio) === "stopped") {
+      const started = yield* startStudio(client, studio.sessionId, inputs.workspaceId);
+      core.info(`Started stopped studio '${name}' (${studio.sessionId})`);
+      studio = { ...studio, statusInfo: started.statusInfo ?? { status: "starting" } };
     }
     const existingCommit = studio.remoteConfig?.commitId;
     if (commitId !== undefined && existingCommit !== undefined && existingCommit !== commitId) {

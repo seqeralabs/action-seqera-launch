@@ -6,6 +6,7 @@ import { ErrorResponseSchema } from "./schemas/common.js";
 import {
   CreateStudioResponseSchema,
   ListStudiosResponseSchema,
+  StartStudioResponseSchema,
   StudioSchema,
   type Studio,
 } from "./schemas/studio.js";
@@ -38,6 +39,23 @@ export function describeStudio(
   return client.requestJson(
     { method: "GET", path: `/studios/${sessionId}`, query: workspaceQuery(workspaceId) },
     StudioSchema,
+  );
+}
+
+export function startStudio(
+  client: SeqeraClient,
+  sessionId: string,
+  workspaceId: number | undefined,
+) {
+  return client.requestJson(
+    {
+      method: "POST",
+      path: `/studios/${sessionId}/start`,
+      query: workspaceQuery(workspaceId),
+      body: {},
+      retryTransient: false,
+    },
+    StartStudioResponseSchema,
   );
 }
 

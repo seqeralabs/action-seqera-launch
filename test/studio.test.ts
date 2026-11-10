@@ -72,6 +72,11 @@ function fixture(options: {
     )
     .when("/studios/sess-1", (url, method) => {
       calls.push({ method, url, body: undefined });
+      if (url.includes("/start")) {
+        return respond(
+          '{"jobSubmitted":true,"sessionId":"sess-1","statusInfo":{"status":"starting"}}',
+        );
+      }
       return respond(JSON.stringify(describes.shift()));
     })
     .when("/studios?", (url, method, body) => {
@@ -144,7 +149,6 @@ describe("runStudioAction", () => {
         revision: "feature",
         commitId: COMMIT,
       },
-      configuration: {},
     });
   });
 
@@ -154,6 +158,21 @@ describe("runStudioAction", () => {
 
     expect(calls.filter((call) => call.method === "POST")).toEqual([]);
     expect(readOutputs(outputPath)["studio-id"]).toBe("sess-1");
+  });
+
+  it("restarts a reused studio that has stopped and waits for it to run", async () => {
+    const { http, calls } = fixture({
+      existing: [studio("stopped")],
+      describes: [studio("running")],
+    });
+    await Effect.runPromise(runStudioAction(http, noSleep));
+
+    expect(calls.map((call) => `${call.method} ${new URL(call.url).pathname}`)).toEqual([
+      "GET /studios",
+      "POST /studios/sess-1/start",
+      "GET /studios/sess-1",
+    ]);
+    expect(readOutputs(outputPath)["status"]).toBe("running");
   });
 
   it("re-finds the studio when another job wins the create race", async () => {

@@ -40,6 +40,10 @@ type _AssertStudioFields = _AssertTrue<
   [Exclude<keyof Studio, keyof ApiDataStudioDto>] extends [never] ? true : false
 >;
 
+export const StartStudioResponseSchema = Schema.Struct({
+  statusInfo: StudioSchema.fields.statusInfo,
+});
+
 export const CreateStudioResponseSchema = Schema.Struct({ studio: StudioSchema });
 
 export const ListStudiosResponseSchema = Schema.Struct({
