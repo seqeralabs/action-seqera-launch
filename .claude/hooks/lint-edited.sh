@@ -4,6 +4,9 @@ file=$(node -e 'const i=JSON.parse(require("fs").readFileSync(0,"utf8"));process
 cd "$CLAUDE_PROJECT_DIR" || exit 0
 rel=${file#"$CLAUDE_PROJECT_DIR"/}
 
+# Format whatever oxfmt handles (it skips unsupported and ignored files), so non-TS edits don't fail format:check at Stop.
+[ -x node_modules/.bin/oxfmt ] && node_modules/.bin/oxfmt "$rel" >/dev/null 2>&1
+
 case $rel in
   src/*.ts | test/*.ts | *.config.ts) ;;
   *) exit 0 ;;
@@ -15,7 +18,6 @@ if [ ! -x node_modules/.bin/oxlint ]; then
   exit 2
 fi
 
-node_modules/.bin/oxfmt "$rel" >/dev/null 2>&1
 if ! out=$(node_modules/.bin/oxlint --quiet --type-aware "$rel" 2>&1); then
   printf 'Lint errors in %s (fix before moving on; CI runs the same rules):\n%s\n' "$rel" "$out" >&2
   exit 2
