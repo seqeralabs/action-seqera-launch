@@ -59,7 +59,10 @@ inputs:
     description: GPUs for the studio
     required: false
   lifespan-hours:
-    description: Hours the studio runs before it stops
+    description: >-
+      Hours the studio runs before it stops; when the workspace sets a lifespan,
+      Platform rejects any other value, so leave this unset
+
     required: false
   conda-environment:
     description: Conda environment definition to add to the studio
