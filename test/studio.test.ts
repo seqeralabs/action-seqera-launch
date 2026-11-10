@@ -146,9 +146,10 @@ describe("runStudioAction", () => {
       computeEnvId: "ce-1",
       remoteConfig: {
         repository: "https://github.com/org/repo",
-        revision: "feature",
+        revision: COMMIT,
         commitId: COMMIT,
       },
+      configuration: {},
     });
   });
 

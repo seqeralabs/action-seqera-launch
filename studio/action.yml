@@ -37,11 +37,11 @@ inputs:
     required: false
     default: https://github.com/${{ github.repository }}
   revision:
-    description: Branch or tag to clone
+    description: Branch or tag to clone; used only when commit-id is empty
     required: false
     default: ${{ github.head_ref || github.ref_name }}
   commit-id:
-    description: Commit to check out
+    description: Commit to check out; set it empty to clone the tip of revision
     required: false
     default: ${{ github.event.pull_request.head.sha || github.sha }}
   tool-url:

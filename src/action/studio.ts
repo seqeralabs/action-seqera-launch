@@ -69,8 +69,11 @@ function buildStudioRequest() {
     const revision = optionalString("revision");
     const commitId = optionalString("commit-id");
     const remoteConfig: NonNullable<ApiDataStudioCreateRequest["remoteConfig"]> = { repository };
-    if (revision !== undefined) {
-      remoteConfig.revision = revision;
+    // Platform ignores commitId and clones whatever `revision` resolves to, so
+    // the commit goes in `revision` to pin the Studio to it.
+    const checkout = commitId ?? revision;
+    if (checkout !== undefined) {
+      remoteConfig.revision = checkout;
     }
     if (commitId !== undefined) {
       remoteConfig.commitId = commitId;
@@ -97,13 +100,13 @@ function buildStudioRequest() {
     if (condaEnvironment !== undefined) {
       configuration.condaEnvironment = condaEnvironment;
     }
+    // Always sent: Platform answers a create without `configuration` with a
+    // generic "Unexpected error" (verified live on cloud.seqera.io).
     const request: Omit<ApiDataStudioCreateRequest, "computeEnvId"> = {
       name: yield* studioName(commitId),
       remoteConfig,
+      configuration,
     };
-    if (Object.keys(configuration).length > 0) {
-      request.configuration = configuration;
-    }
 
     const description = optionalString("description");
     if (description !== undefined) {
