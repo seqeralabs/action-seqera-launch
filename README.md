@@ -156,6 +156,39 @@ The action sends the selection as the Platform API's `syntaxParser` launch field
 | `status`        | Terminal workflow status, when waited for.       |
 | `error-message` | Failure message from the run, when it failed.    |
 
+## Launch a Studio from CI
+
+The `studio` sub-action creates a [Seqera Studio](https://docs.seqera.io/platform-cloud/studios/add-studio-git-repo) from this repository at the commit under test. Platform clones the repository and builds the Studio image from `.seqera/studio-config.yaml`, so the repository must contain that file. The access token needs the **Maintain** role or above in the workspace.
+
+```yaml
+on: pull_request
+
+jobs:
+  studio:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: seqeralabs/action-seqera-launch/studio@v1
+        id: studio
+        with:
+          access-token: ${{ secrets.SEQERA_ACCESS_TOKEN }}
+          workspace-id: "123456789"
+          compute-env: my-compute-env
+
+      # Optional: link the Studio from the pull request.
+      - run: gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "Studio for $SHA: $URL"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          URL: ${{ steps.studio.outputs.studio-url }}
+```
+
+The Studio is named `<repository name>-<short commit>` unless `name` is set, so each commit gets its own Studio and never runs stale code. A Studio that already has the name is reused rather than recreated, so rerunning a job converges on the same Studio. With the default `wait: running`, the step waits until the Studio is running and fails with the Wave build log link if the image build fails. Set `wait: none` to return as soon as it is created.
+
+Outputs are `studio-id`, `studio-url`, `status`, and `workspace-id`. They are set even when the step fails. See [studio/action.yml](studio/action.yml) for every input.
+
 ## Migrating from action-tower-launch
 
 Four things will break an existing workflow: inputs are `kebab-case`, outputs are too (`workflowId` is now `workflow-id`), the `json` output is gone, and `wait` is an enum whose default no longer means fire-and-forget.
