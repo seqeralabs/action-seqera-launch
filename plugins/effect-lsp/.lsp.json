@@ -1,0 +1,11 @@
+{
+  "effect": {
+    "command": "${CLAUDE_PLUGIN_ROOT}/bin/effect-lsp",
+    "workspaceFolder": "${CLAUDE_PROJECT_DIR}",
+    "extensionToLanguage": {
+      ".ts": "typescript",
+      ".mts": "typescript",
+      ".cts": "typescript"
+    }
+  }
+}

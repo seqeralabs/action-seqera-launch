@@ -1,0 +1,5 @@
+{
+  "name": "effect-lsp",
+  "description": "Effect Language Service (@effect/tsgo) for Effect-aware TypeScript diagnostics",
+  "version": "0.1.0"
+}
