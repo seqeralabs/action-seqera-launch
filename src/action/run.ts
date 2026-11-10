@@ -292,7 +292,7 @@ export function runAction(http?: SeqeraHttpTransport) {
       workflowId,
       buildActionOutputOptions({
         status,
-        errorMessage: describe.workflow?.errorMessage ?? undefined,
+        errorMessage: describe.workflow?.errorMessage,
       }),
     );
 
@@ -302,7 +302,7 @@ export function runAction(http?: SeqeraHttpTransport) {
         workflowUrl: url,
         workspaceRef: ref,
         status,
-        errorMessage: describe.workflow?.errorMessage ?? undefined,
+        errorMessage: describe.workflow?.errorMessage,
         succeeded: true,
       }),
     );

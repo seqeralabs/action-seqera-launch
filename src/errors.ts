@@ -103,7 +103,7 @@ export function workflowTerminalFailure(
   errorMessageOverride?: string,
 ): WorkflowTerminalFailureError {
   const workflow = describe.workflow;
-  const errorMessage = errorMessageOverride ?? workflow?.errorMessage ?? undefined;
+  const errorMessage = errorMessageOverride ?? workflow?.errorMessage;
   const fields: WorkflowTerminalFailurePayload = {
     status,
     workflowUrl,
@@ -112,11 +112,11 @@ export function workflowTerminalFailure(
   if (errorMessage !== undefined) {
     fields.errorMessage = errorMessage;
   }
-  const errorReport = workflow?.errorReport ?? undefined;
+  const errorReport = workflow?.errorReport;
   if (errorReport !== undefined) {
     fields.errorReport = errorReport;
   }
-  const exitStatus = workflow?.exitStatus ?? undefined;
+  const exitStatus = workflow?.exitStatus;
   if (exitStatus !== undefined) {
     fields.exitStatus = exitStatus;
   }
